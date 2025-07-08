@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1200">
+  <title>조직도</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f9f9f9;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 30px auto;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      position: relative;
+      display: flex;
+    }
+    .sidebar {
+      width: 200px;
+      padding-right: 20px;
+      flex-shrink: 0;
+    }
+    .sidebar ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .sidebar li {
+      margin: 10px 0;
+      color: #333;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: normal;
+      transition: font-weight 0.2s;
+    }
+    .sidebar li.active {
+      font-weight: bold;
+    }
+    .sidebar li:first-child {
+      font-size: 18px;
+      font-weight: bold;
+      color: #000;
+      margin-bottom: 20px;
+    }
+    .main {
+      flex: 1;
+      padding-left: 20px;
+    }
+    .main-title {
+      font-size: 36px;
+      font-weight: bold;
+      margin-bottom: 40px;
+      margin-top: 30px;
+    }
+    .orgchart-area {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-top: 40px;
+      position: relative;
+      width: 900px;
+      min-height: 500px;
+    }
+    .org-level {
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      margin-bottom: 40px;
+      position: relative;
+      flex-wrap: wrap;
+      width: 100%;
+      z-index: 1;
+    }
+    .org-node {
+      background: #d5f5d5;
+      border: 1px solid #8bc34a;
+      border-radius: 12px;
+      min-width: 120px;
+      min-height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 400;
+      color: #333;
+      font-family: Arial, sans-serif;
+      position: relative;
+      z-index: 2;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+      margin-bottom: 10px;
+      margin-top: 10px;
+      word-break: keep-all;
+    }
+    .org-svg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 0;
+    }
+    @media (max-width: 1200px) {
+      .container { flex-direction: column; }
+      .sidebar { width: 100vw; padding-right: 0; }
+      .main { padding-left: 0; }
+      .orgchart-area { margin-top: 20px; width: 100vw; min-width: 0; }
+      .org-level, .org-level:last-child { max-width: 100vw; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="sidebar">
+      <ul>
+        <li>조직관리</li>
+        <li onclick="location.href='/dep_work'">부서별 업무 현황 조회</li>
+        <li onclick="location.href='/orgmember'">구성원 관리</li>
+        <li class="active" onclick="location.href='/orgchart'">조직도</li>
+      </ul>
+    </div>
+    <div class="main">
+      <div class="main-title">조직도</div>
+      <div class="orgchart-area" id="orgchart-area">
+        <div class="org-level" id="level1">
+          <div class="org-node" id="node-1">영업부</div>
+          <div class="org-node" id="node-2">기술부</div>
+          <div class="org-node" id="node-3">마케팅부</div>
+          <div class="org-node" id="node-4">인사부</div>
+          <div class="org-node" id="node-5">경영부</div>
+        </div>
+        <div class="org-level" id="level2">
+          <div class="org-node">영업1팀</div>
+          <div class="org-node">영업2팀</div>
+          <div class="org-node">기술1팀</div>
+          <div class="org-node">기술2팀</div>
+          <div class="org-node">마케팅팀</div>
+          <div class="org-node">인사팀</div>
+          <div class="org-node">경영지원팀</div>
+        </div>
+        <div class="org-level" id="level3">
+          <div class="org-node">A파트</div>
+          <div class="org-node">B파트</div>
+          <div class="org-node">C파트</div>
+          <div class="org-node">D파트</div>
+          <div class="org-node">E파트</div>
+          <div class="org-node">F파트</div>
+          <div class="org-node">G파트</div>
+        </div>
+        <svg class="org-svg" id="org-svg"></svg>
+      </div>
+    </div>
+  </div>
+  <script>
+    // 조직도 스타일(수직-가로-수직)로 선을 그림
+    function drawOrgLines() {
+      const svg = document.getElementById('org-svg');
+      const area = document.getElementById('orgchart-area');
+      svg.innerHTML = '';
+      svg.setAttribute('width', area.offsetWidth);
+      svg.setAttribute('height', area.offsetHeight);
+      const areaRect = area.getBoundingClientRect();
+
+      // 1단계(부서) → 2단계(팀)
+      const node1 = document.getElementById('node-1');
+      const level2 = document.getElementById('level2');
+      const teamNodes = Array.from(level2.getElementsByClassName('org-node'));
+      const node1Rect = node1.getBoundingClientRect();
+      const node1Center = {
+        x: node1Rect.left - areaRect.left + node1Rect.width / 2,
+        y: node1Rect.top - areaRect.top + node1Rect.height
+      };
+      // 1. 부서 아래로 수직선
+      const teamY = teamNodes[0].getBoundingClientRect().top - areaRect.top;
+      svg.innerHTML += `<line x1="${node1Center.x}" y1="${node1Center.y}" x2="${node1Center.x}" y2="${teamY - 20}" stroke="black" stroke-width="2" />`;
+      // 2. 팀들 사이 가로선
+      const firstTeamRect = teamNodes[0].getBoundingClientRect();
+      const lastTeamRect = teamNodes[teamNodes.length-1].getBoundingClientRect();
+      const yH = teamY - 20;
+      const x1 = firstTeamRect.left - areaRect.left + firstTeamRect.width/2;
+      const x2 = lastTeamRect.left - areaRect.left + lastTeamRect.width/2;
+      svg.innerHTML += `<line x1="${x1}" y1="${yH}" x2="${x2}" y2="${yH}" stroke="black" stroke-width="2" />`;
+      // 3. 각 팀으로 수직선
+      teamNodes.forEach(team => {
+        const teamRect = team.getBoundingClientRect();
+        const teamCenter = {
+          x: teamRect.left - areaRect.left + teamRect.width / 2,
+          y: teamRect.top - areaRect.top
+        };
+        svg.innerHTML += `<line x1="${teamCenter.x}" y1="${yH}" x2="${teamCenter.x}" y2="${teamCenter.y}" stroke="black" stroke-width="2" />`;
+      });
+
+      // 2단계(팀) → 3단계(파트)
+      const level3 = document.getElementById('level3');
+      const partNodes = Array.from(level3.getElementsByClassName('org-node'));
+      // 팀별로 파트 2개씩 연결(예시)
+      const teamToParts = [
+        [0, 1], // 인사팀 → 채용, 교육
+        [2, 3], // 총무팀 → 복리후생, 시설관리
+        [4, 5]  // 재무팀 → 회계, 자금
+      ];
+      teamNodes.forEach((team, i) => {
+        const teamRect = team.getBoundingClientRect();
+        const teamBottom = teamRect.top - areaRect.top + teamRect.height;
+        // 연결될 파트들의 y좌표
+        const partYs = teamToParts[i].map(idx => partNodes[idx].getBoundingClientRect().top - areaRect.top);
+        // 1. 팀 아래로 수직선 (가장 위 파트까지)
+        const minY = Math.min(...partYs) - 20;
+        svg.innerHTML += `<line x1="${teamRect.left - areaRect.left + teamRect.width/2}" y1="${teamBottom}" x2="${teamRect.left - areaRect.left + teamRect.width/2}" y2="${minY}" stroke="black" stroke-width="2" />`;
+        // 2. 파트들 사이 가로선
+        const part1Rect = partNodes[teamToParts[i][0]].getBoundingClientRect();
+        const part2Rect = partNodes[teamToParts[i][1]].getBoundingClientRect();
+        const px1 = part1Rect.left - areaRect.left + part1Rect.width/2;
+        const px2 = part2Rect.left - areaRect.left + part2Rect.width/2;
+        svg.innerHTML += `<line x1="${px1}" y1="${minY}" x2="${px2}" y2="${minY}" stroke="black" stroke-width="2" />`;
+        // 3. 각 파트로 수직선
+        teamToParts[i].forEach(idx => {
+          const partRect = partNodes[idx].getBoundingClientRect();
+          const partCenter = {
+            x: partRect.left - areaRect.left + partRect.width / 2,
+            y: partRect.top - areaRect.top
+          };
+          svg.innerHTML += `<line x1="${partCenter.x}" y1="${minY}" x2="${partCenter.x}" y2="${partCenter.y}" stroke="black" stroke-width="2" />`;
+        });
+      });
+    }
+    window.addEventListener('load', drawOrgLines);
+    window.addEventListener('resize', drawOrgLines);
+  </script>
+</body>
+</html> 

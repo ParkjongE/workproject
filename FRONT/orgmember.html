@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=1200">
+  <title>구성원 관리</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body {
+      font-family: 'Inter', Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f9f9f9;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 30px auto;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      position: relative;
+      display: flex;
+    }
+    .sidebar {
+      width: 200px;
+      padding-right: 20px;
+      flex-shrink: 0;
+    }
+    .sidebar ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .sidebar li {
+      margin: 10px 0;
+      color: #333;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: normal;
+      transition: font-weight 0.2s;
+    }
+    .sidebar li.active {
+      font-weight: bold;
+    }
+    .sidebar li:first-child {
+      font-size: 18px;
+      font-weight: bold;
+      color: #000;
+      margin-bottom: 20px;
+    }
+    .content {
+      margin-left: 0;
+      flex: 1;
+      position: relative;
+    }
+    .top-actions {
+      position: absolute;
+      top: 0;
+      right: 0;
+      display: flex;
+      gap: 12px;
+    }
+    .action-btn {
+      background: #d5f5d5;
+      border: 1px solid #8bc34a;
+      border-radius: 16px;
+      font-size: 20px;
+      font-weight: 500;
+      padding: 8px 24px;
+      cursor: pointer;
+      color: #000;
+      font-family: 'Inter', Arial, sans-serif;
+    }
+    .title {
+      font-size: 32px;
+      font-weight: 800;
+      margin-top: 30px;
+      margin-bottom: 24px;
+      color: #000;
+    }
+    .search-sort-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .search-box {
+      display: flex;
+      align-items: center;
+      background: #d5f5d5;
+      border: 1px solid #8bc34a;
+      border-radius: 8px;
+      padding: 0 20px;
+      height: 48px;
+      min-width: 320px;
+      flex: 1;
+      max-width: 400px;
+    }
+    .search-box input {
+      border: none;
+      background: transparent;
+      font-size: 18px;
+      outline: none;
+      width: 100%;
+      margin-right: 10px;
+    }
+    .search-box button {
+      background: none;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+    }
+    .sort-group-box {
+      display: flex;
+      align-items: center;
+      background: #fff;
+      border: 1px solid #000;
+      border-radius: 16px;
+      height: 44px;
+      padding: 0 20px;
+      gap: 20px;
+    }
+    .sort-group-box span {
+      font-family: 'Comfortaa', Arial, sans-serif;
+      font-size: 18px;
+      font-weight: 400;
+      letter-spacing: 0.1em;
+      color: #000;
+      cursor: pointer;
+    }
+    .member-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 24px 16px;
+      justify-content: flex-start;
+      margin-top: 24px;
+    }
+    .member-card {
+      width: 240px;
+      min-width: 200px;
+      height: 300px;
+      background: #fff;
+      border: 1px solid #000;
+      border-radius: 8px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+      font-size: 14px;
+      padding: 12px 8px 16px 8px;
+    }
+    .member-photo {
+      width: 70px;
+      height: 70px;
+      background: #D9D9D9;
+      border-radius: 50%;
+      margin-top: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      color: #888;
+    }
+    .member-info {
+      width: 100%;
+      margin-top: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      font-size: 13px;
+    }
+    .member-info-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #000;
+      flex-wrap: wrap;
+    }
+    .member-info-row .label {
+      width: 38px;
+      color: #888;
+      font-size: 12px;
+      font-weight: 400;
+      flex-shrink: 0;
+    }
+    .member-status, .edit-btn {
+      position: static;
+      display: inline-block;
+      margin: 0 4px;
+      font-size: 13px;
+      font-weight: 500;
+      border-radius: 12px;
+      padding: 2px 12px;
+      border: 1px solid #8bc34a;
+    }
+    .member-status {
+      background: #d5f5d5;
+      color: #000;
+      margin-top: 8px;
+    }
+    .edit-btn {
+      background: #d5f5d5;
+      color: #000;
+      margin-top: 8px;
+      cursor: pointer;
+      border: 1px solid #8bc34a;
+    }
+    .member-card-bottom {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-top: auto;
+    }
+    @media (max-width: 1200px) {
+      .container { max-width: 100vw; flex-direction: column; }
+      .sidebar { width: 100vw; padding-right: 0; }
+      .content { margin-left: 0; }
+      .member-list { gap: 16px 4px; }
+      .member-card { width: 95vw; min-width: 160px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="sidebar">
+      <ul>
+        <li>조직관리</li>
+        <li onclick="location.href='/dep_work'">부서별 업무 현황 조회</li>
+        <li class="active" onclick="location.href='/orgmember'">구성원 관리</li>
+        <li onclick="location.href='/orgchart'">조직도</li>
+      </ul>
+    </div>
+    <div class="content">
+      <div class="top-actions">
+        <button class="action-btn">부서 관리</button>
+        <button class="action-btn">편집</button>
+      </div>
+      <div class="title">구성원 관리</div>
+      <div class="search-sort-row">
+        <div class="search-box">
+          <input type="text" placeholder="검색" />
+          <button>🔍</button>
+        </div>
+        <div class="sort-group-box">
+          <span>정렬 기준</span>
+          <span>그룹화</span>
+        </div>
+      </div>
+      <div class="member-list">
+        <div class="member-card">
+          <div class="member-photo">사진</div>
+          <div class="member-info">
+            <div class="member-info-row"><span class="label">이름</span>홍길동</div>
+            <div class="member-info-row"><span class="label">사번</span>20240001</div>
+            <div class="member-info-row"><span class="label">팀</span>인사팀</div>
+            <div class="member-info-row"><span class="label">직책</span>사원</div>
+            <div class="member-info-row"><span class="label">email</span>hong@company.com</div>
+            <div class="member-info-row"><span class="label">입사일</span>2024-01-01</div>
+          </div>
+          <div class="member-card-bottom">
+            <span class="member-status">휴직</span>
+            <button class="edit-btn">편집</button>
+          </div>
+        </div>
+        <div class="member-card">
+          <div class="member-photo">사진</div>
+          <div class="member-info">
+            <div class="member-info-row"><span class="label">이름</span>김철수</div>
+            <div class="member-info-row"><span class="label">사번</span>20240002</div>
+            <div class="member-info-row"><span class="label">팀</span>총무팀</div>
+            <div class="member-info-row"><span class="label">직책</span>대리</div>
+            <div class="member-info-row"><span class="label">email</span>kim@company.com</div>
+            <div class="member-info-row"><span class="label">입사일</span>2023-03-15</div>
+          </div>
+          <div class="member-card-bottom">
+            <span class="member-status">재직</span>
+            <button class="edit-btn">편집</button>
+          </div>
+        </div>
+        <!-- 더미 구성원 카드 추가 가능 -->
+      </div>
+    </div>
+  </div>
+</body>
+</html> 
