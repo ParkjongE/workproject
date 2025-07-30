@@ -239,6 +239,7 @@ export default {
     // 연차 정보 로드
     console.log('[InfoCardSection] 연차 정보 로드 시작');
     this.loadLeaveInfo();
+    this.loadSalaryStatements();
     console.log('[InfoCardSection] 연차 정보 로드 호출 완료');
   },
   watch: {
@@ -264,24 +265,7 @@ export default {
         file: null,
         fileName: ''
       },
-      salaryStatements: {
-        '2023': {
-          '1': { fileName: '2023년_1월_급여명세서.pdf', url: '#' },
-          '3': { fileName: '2023년_3월_급여명세서.pdf', url: '#' },
-          '5': { fileName: '2023년_5월_급여명세서.pdf', url: '#' },
-          '7': { fileName: '2023년_7월_급여명세서.pdf', url: '#' },
-          '9': { fileName: '2023년_9월_급여명세서.pdf', url: '#' },
-          '11': { fileName: '2023년_11월_급여명세서.pdf', url: '#' }
-        },
-        '2022': {
-          '2': { fileName: '2022년_2월_급여명세서.pdf', url: '#' },
-          '4': { fileName: '2022년_4월_급여명세서.pdf', url: '#' },
-          '6': { fileName: '2022년_6월_급여명세서.pdf', url: '#' },
-          '8': { fileName: '2022년_8월_급여명세서.pdf', url: '#' },
-          '10': { fileName: '2022년_10월_급여명세서.pdf', url: '#' },
-          '12': { fileName: '2022년_12월_급여명세서.pdf', url: '#' }
-        }
-      },
+      salaryStatements: {},
       
       // 연차 정보
       totalLeave: 0,
@@ -394,6 +378,79 @@ export default {
     },
     
     // 급여명세서 관련
+    async loadSalaryStatements() {
+      try {
+        console.log('[loadSalaryStatements] 급여명세서 목록 로드 시작');
+        console.log('[loadSalaryStatements] 현재 salaryStatements:', this.salaryStatements);
+        
+        // 로그인 상태 확인
+        const userStr = localStorage.getItem('user');
+        console.log('[loadSalaryStatements] localStorage user:', userStr);
+        
+        if (!userStr) {
+          console.error('[loadSalaryStatements] 로그인 정보가 없습니다');
+          return;
+        }
+        
+        const user = JSON.parse(userStr);
+        const userId = user.id;
+        
+        console.log('[loadSalaryStatements] 사용자 ID:', userId);
+        console.log('[loadSalaryStatements] 급여명세서 목록 요청 URL:', `/api/salary/list?user_id=${userId}`);
+        
+        // API 호출하여 급여명세서 목록 가져오기
+        const response = await api.get(`/api/salary/list?user_id=${userId}`);
+        
+        console.log('[loadSalaryStatements] 급여명세서 목록 응답 상태:', response.status);
+        console.log('[loadSalaryStatements] 급여명세서 목록 응답 헤더:', response.headers);
+        
+        const result = response.data;
+        console.log('[loadSalaryStatements] 급여명세서 목록 결과:', result);
+        console.log('[loadSalaryStatements] result.success:', result.success);
+        console.log('[loadSalaryStatements] result.data:', result.data);
+        console.log('[loadSalaryStatements] result.data 길이:', result.data ? result.data.length : 'undefined');
+        
+        if (result.success && result.data) {
+          // 서버 데이터를 프론트엔드 형식으로 변환
+          const statements = {};
+          console.log('[loadSalaryStatements] 데이터 변환 시작');
+          
+          result.data.forEach((item, index) => {
+            console.log(`[loadSalaryStatements] 아이템 ${index}:`, item);
+            const year = item.year.toString();
+            const month = item.month.toString();
+            
+            console.log(`[loadSalaryStatements] year: ${year}, month: ${month}`);
+            
+            if (!statements[year]) {
+              statements[year] = {};
+              console.log(`[loadSalaryStatements] ${year}년 객체 생성`);
+            }
+            
+            statements[year][month] = {
+              fileName: item.fileName,
+              fileSize: item.fileSize,
+              year: item.year,
+              month: item.month
+            };
+            
+            console.log(`[loadSalaryStatements] ${year}년 ${month}월 데이터 설정:`, statements[year][month]);
+          });
+          
+          console.log('[loadSalaryStatements] 변환된 statements:', statements);
+          this.salaryStatements = statements;
+          console.log('[loadSalaryStatements] this.salaryStatements 업데이트 완료:', this.salaryStatements);
+          console.log('[loadSalaryStatements] Object.keys(this.salaryStatements):', Object.keys(this.salaryStatements));
+        } else {
+          console.log('[loadSalaryStatements] 성공하지 않았거나 데이터가 없음');
+        }
+      } catch (error) {
+        console.error('[loadSalaryStatements] 급여명세서 목록 로드 오류:', error);
+        console.error('[loadSalaryStatements] 오류 상세:', error.response ? error.response.data : '응답 없음');
+        console.error('[loadSalaryStatements] 오류 상태:', error.response ? error.response.status : '상태 없음');
+      }
+    },
+    
     toggleSalaryYear(year) {
       if (this.selectedSalaryYear === year) {
         this.selectedSalaryYear = null;
@@ -449,24 +506,50 @@ export default {
       this.$emit('privacy-changed');
     },
     
-    downloadSalaryStatement(year, month) {
-      if (!this.salaryStatements[year] || !this.salaryStatements[year][month]) {
-        alert('해당 급여명세서를 찾을 수 없습니다.');
-        return;
+    async downloadSalaryStatement(year, month) {
+      try {
+        console.log('[downloadSalaryStatement] 급여명세서 다운로드 시작:', year, month);
+        
+        // 로그인 상태 확인
+        const userStr = localStorage.getItem('user');
+        if (!userStr) {
+          console.error('[downloadSalaryStatement] 로그인 정보가 없습니다');
+          alert('로그인 정보가 없습니다.');
+          return;
+        }
+        
+        const user = JSON.parse(userStr);
+        const userId = user.id;
+        
+        console.log('[downloadSalaryStatement] 급여명세서 다운로드 요청:', `user_id=${userId}, year=${year}, month=${month}`);
+        
+        // API 호출하여 급여명세서 다운로드
+        const response = await api.get(`/api/salary/statement?user_id=${userId}&year=${year}&month=${month}`, {
+          responseType: 'blob'
+        });
+        
+        console.log('[downloadSalaryStatement] 급여명세서 다운로드 응답:', response.status);
+        
+        // 파일 다운로드
+        const blob = new Blob([response.data], { type: 'application/pdf' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `급여명세서_${year}년_${month}월.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        
+        console.log('[downloadSalaryStatement] 급여명세서 다운로드 완료');
+      } catch (error) {
+        console.error('[downloadSalaryStatement] 급여명세서 다운로드 오류:', error);
+        if (error.response && error.response.status === 404) {
+          alert('해당 급여명세서를 찾을 수 없습니다.');
+        } else {
+          alert('급여명세서 다운로드 중 오류가 발생했습니다.');
+        }
       }
-      
-      const statement = this.salaryStatements[year][month];
-      console.log('급여명세서 다운로드:', year, month, statement);
-      
-      const link = document.createElement('a');
-      link.href = statement.url;
-      link.download = statement.fileName;
-      link.target = '_blank';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      alert(`${year}년 ${month}월 급여명세서를 다운로드합니다.`);
     },
     
     downloadAllStatements(year) {

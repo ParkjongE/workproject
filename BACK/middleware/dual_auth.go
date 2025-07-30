@@ -65,6 +65,9 @@ func DualAuthMiddleware(next http.Handler) http.Handler {
 			claims.UserID, claims.Userid, claims.Role)
 
 		// 3. 세션 정보와 JWT 정보 일치 여부(선택)
+		log.Printf("[DualAuth] 세션과 JWT 비교: 세션(userID=%d, username=%s, role=%s) vs JWT(userID=%d, username=%s, role=%s)",
+			userID, username, role, claims.UserID, claims.Userid, claims.Role)
+
 		if userID != claims.UserID || username != claims.Userid || role != claims.Role {
 			log.Printf("[DualAuth] 세션과 JWT 사용자 정보 불일치: 세션(userID=%d, username=%s, role=%s) vs JWT(userID=%d, username=%s, role=%s)",
 				userID, username, role, claims.UserID, claims.Userid, claims.Role)

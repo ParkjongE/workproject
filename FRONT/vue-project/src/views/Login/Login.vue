@@ -95,6 +95,7 @@ export default {
           if (response.data.access_token) {
             console.log('JWT 토큰 저장:', response.data.access_token.substring(0, 20) + '...');
             localStorage.setItem('jwt_token', response.data.access_token);
+            console.log('localStorage에 저장 완료');
           } else {
             console.error('access_token이 응답에 없습니다!');
           }
@@ -103,7 +104,22 @@ export default {
             localStorage.setItem('rememberMe', 'true');
           }
           
-          console.log('저장된 토큰 확인:', localStorage.getItem('jwt_token'));
+          // 저장 확인
+          const savedToken = localStorage.getItem('jwt_token');
+          const savedUser = localStorage.getItem('user');
+          console.log('저장된 토큰 확인:', savedToken ? savedToken.substring(0, 20) + '...' : '토큰 없음');
+          console.log('저장된 사용자 확인:', savedUser ? '사용자 정보 있음' : '사용자 정보 없음');
+          console.log('localStorage 전체 확인:', Object.keys(localStorage));
+          
+          // 브라우저에서 직접 확인
+          console.log('=== localStorage 직접 확인 ===');
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            const value = localStorage.getItem(key);
+            console.log(`${key}: ${value ? value.substring(0, 50) + '...' : 'null'}`);
+          }
+          console.log('=== localStorage 직접 확인 끝 ===');
+          
           this.$router.push('/commute');
         } else {
           this.errorMessage = response.data.error || '로그인에 실패했습니다.';

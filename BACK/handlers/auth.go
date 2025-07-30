@@ -239,7 +239,7 @@ func HandleRefreshToken(w http.ResponseWriter, r *http.Request) {
 // GetCurrentUser 현재 로그인한 사용자 정보 조회
 func GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 	// 세션에서 사용자 정보 가져오기
-	session, err := config.Store.Get(r, "session-name")
+	session, err := config.Store.Get(r, "user-session")
 	if err != nil {
 		http.Error(w, "세션 오류", http.StatusInternalServerError)
 		return

@@ -1,4 +1,4 @@
-// 라이브러리 없이 전역 상태 관리 구현 (Pinia 대체)
+// 라이브러리 없이 전역 상태 관리 구현 
 import { reactive, computed } from 'vue'
 import api from '@/plugins/axios'
 

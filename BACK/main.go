@@ -83,6 +83,10 @@ func main() {
 	privateMux.HandleFunc("/api/leave/policy", handlers.GetLeavePolicy)
 	privateMux.HandleFunc("/api/leave/calculate", handlers.CalculateLeaveForDate)
 	privateMux.HandleFunc("/api/leave/update-all", handlers.UpdateAllUsersLeaveStatus)
+
+	// 급여명세서 관련 API
+	privateMux.HandleFunc("/api/salary/statement", handlers.GetSalaryStatement)
+	privateMux.HandleFunc("/api/salary/list", handlers.GetSalaryStatementList)
 	privateMux.HandleFunc("/api/dual-auth/profile", func(w http.ResponseWriter, r *http.Request) {
 		userID, username, role, ok := middleware.GetUserFromContext(r.Context())
 		if !ok {
@@ -116,6 +120,13 @@ func main() {
 		// 인증이 필요한 API
 		if strings.HasPrefix(r.URL.Path, "/api/") {
 			log.Printf("인증 필요 API 접근: %s", r.URL.Path)
+
+			// 급여명세서 API 특별 로그
+			if strings.Contains(r.URL.Path, "/api/salary/") {
+				log.Printf("[SALARY API] 급여명세서 API 요청: %s", r.URL.Path)
+				log.Printf("[SALARY API] 요청 파라미터: %s", r.URL.RawQuery)
+			}
+
 			middleware.EnableCORS(middleware.DualAuthMiddleware(privateMux)).ServeHTTP(w, r)
 			return
 		}
