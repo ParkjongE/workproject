@@ -1,131 +1,134 @@
 package main
 
 import (
-    "github.com/gin-gonic/gin" // Gin 웹 프레임워크 임포트
-    "net/http"                 // HTTP 상태 코드 정의 사용
+	"encoding/json"
+	"log"
+	"net/http"
+	"strings"
+
+	"BACK/config"
+	"BACK/handlers"
+	"BACK/middleware"
+	"BACK/utills"
 )
 
-// DepartmentStatus는 부서별 업무현황을 나타내는 구조체
-type DepartmentStatus struct {
-    DepartmentName string `json:"department_name"` // 부서 이름
-    TeamName       string `json:"team_name"`       // 팀 이름
-    TeamLead       string `json:"team_lead"`       // 팀장 이름
-    MemberCount    int    `json:"member_count"`    // 팀원 수
-    Tasks          string `json:"tasks"`           // 담당 업무
-    OngoingProject string `json:"ongoing_project"` // 진행 중인 프로젝트
-    Deadline       string `json:"deadline"`        // 마감 기한
-}
-
-// departmentStatuses는 부서별 업무현황에 대한 샘플 데이터
-var departmentStatuses = []DepartmentStatus{
-    {
-        DepartmentName: "영업부",
-        TeamName:       "영업1팀",
-        TeamLead:       "김팀장",
-        MemberCount:    5,
-        Tasks:          "고객 관리, 매출 보고",
-        OngoingProject: "신규 시장 진출",
-        Deadline:       "2025-08-15",
-    },
-    {
-        DepartmentName: "개발부",
-        TeamName:       "백엔드팀",
-        TeamLead:       "이팀장",
-        MemberCount:    7,
-        Tasks:          "API 개발, 서버 관리",
-        OngoingProject: "업무관리 시스템",
-        Deadline:       "2025-09-01",
-    },
-    {
-        DepartmentName: "개발부",
-        TeamName:       "프론트엔드팀",
-        TeamLead:       "박팀장",
-        MemberCount:    4,
-        Tasks:          "UI/UX 개발, 웹 개발",
-        OngoingProject: "사용자 인터페이스 개선",
-        Deadline:       "2025-08-30",
-    },
-}
-
-// departments는 부서 이름 목록에 대한 샘플 데이터
-var departments = []string{"영업부", "개발부", "디자인부"}
-
 func main() {
-    // Gin 엔진 생성 (기본 미들웨어 포함: 로깅, 복구)
-    r := gin.Default()
+	utills.InitJWTSecret()
+	config.InitDB()
+	defer config.DB.Close()
 
-    // CORS 미들웨어 추가
-    r.Use(func(c *gin.Context) {
-        c.Header("Access-Control-Allow-Origin", "*")
-        c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-        c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
-        
-        if c.Request.Method == "OPTIONS" {
-            c.AbortWithStatus(204)
-            return
-        }
-        
-        c.Next()
-    })
+	publicMux := http.NewServeMux()
+	privateMux := http.NewServeMux()
 
-    // 정적 파일 서빙 설정 - 상위 디렉토리의 FRONT 폴더를 서빙
-    r.Static("/static", "../FRONT")
-    r.LoadHTMLGlob("../FRONT/*.html")
+	// 공개 API (인증 없이 접근 가능)
+	publicMux.HandleFunc("/api/register", handlers.HandleRegister)
+	publicMux.HandleFunc("/api/login", handlers.HandleLogin)
+	publicMux.HandleFunc("/api/jwt/login", handlers.HandleJWTLogin)
+	publicMux.HandleFunc("/api/jwt/register", handlers.HandleRegister)
+	publicMux.HandleFunc("/api/refresh", handlers.HandleRefreshToken)
 
-    // 루트 경로에서 login.html 서빙
-    r.GET("/", func(c *gin.Context) {
-        c.HTML(http.StatusOK, "login.html", nil)
-    })
+	// 인증이 필요한 API
+	privateMux.HandleFunc("/api/logout", handlers.HandleLogout)
+	privateMux.HandleFunc("/api/user/profile", handlers.GetCurrentUser)
+	privateMux.HandleFunc("/api/jwt/logout", handlers.HandleJWTLogout)
+	privateMux.HandleFunc("/api/jwt/refresh", handlers.HandleTokenRefresh)
+	privateMux.HandleFunc("/api/jwt/verify", handlers.HandleVerifyToken)
+	privateMux.HandleFunc("/api/jwt/user/profile", func(w http.ResponseWriter, r *http.Request) {
+		userID, username, role, ok := middleware.GetUserFromContext(r.Context())
+		if !ok {
+			http.Error(w, "User not authenticated", http.StatusUnauthorized)
+			return
+		}
+		response := map[string]interface{}{
+			"message": "JWT 기반 인증된 사용자의 프로필 정보입니다",
+			"user": map[string]interface{}{
+				"user_id":  userID,
+				"username": username,
+				"role":     role,
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
+	})
+	privateMux.HandleFunc("/api/jwt/admin/dashboard", func(w http.ResponseWriter, r *http.Request) {
+		userID, username, role, ok := middleware.GetUserFromContext(r.Context())
+		if !ok {
+			http.Error(w, "User not authenticated", http.StatusUnauthorized)
+			return
+		}
+		response := map[string]interface{}{
+			"message": "관리자 대시보드에 접근했습니다",
+			"user": map[string]interface{}{
+				"user_id":  userID,
+				"username": username,
+				"role":     role,
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
+	})
+	privateMux.HandleFunc("/api/schedule", handlers.AddSchedule)
+	privateMux.HandleFunc("/api/schedule/", handlers.HandleScheduleOperations)
+	privateMux.HandleFunc("/api/schedules", handlers.GetSchedulesByUser)
 
-    // /orgchart 경로에서 orgchart.html 서빙
-    r.GET("/orgchart", func(c *gin.Context) {
-        c.HTML(http.StatusOK, "orgchart.html", nil)
-    })
+	// 출퇴근 관련 API
+	privateMux.HandleFunc("/api/attendance/checkin", handlers.CheckIn)
+	privateMux.HandleFunc("/api/attendance/checkout", handlers.CheckOut)
+	privateMux.HandleFunc("/api/attendance/records/", handlers.GetAttendanceRecords)
+	privateMux.HandleFunc("/api/attendance/today/", handlers.GetTodayAttendance)
+	privateMux.HandleFunc("/api/attendance/date/", handlers.GetAttendanceByDate)
 
-    // /orgmember 경로에서 orgmember.html 서빙
-    r.GET("/orgmember", func(c *gin.Context) {
-        c.HTML(http.StatusOK, "orgmember.html", nil)
-    })
+	// 연차 관련 API
+	privateMux.HandleFunc("/api/leave/status", handlers.GetLeaveStatus)
+	privateMux.HandleFunc("/api/leave/policy", handlers.GetLeavePolicy)
+	privateMux.HandleFunc("/api/leave/calculate", handlers.CalculateLeaveForDate)
+	privateMux.HandleFunc("/api/leave/update-all", handlers.UpdateAllUsersLeaveStatus)
+	privateMux.HandleFunc("/api/dual-auth/profile", func(w http.ResponseWriter, r *http.Request) {
+		userID, username, role, ok := middleware.GetUserFromContext(r.Context())
+		if !ok {
+			http.Error(w, "User not authenticated", http.StatusUnauthorized)
+			return
+		}
+		response := map[string]interface{}{
+			"message": "세션+JWT 모두 인증된 사용자의 프로필 정보입니다",
+			"user": map[string]interface{}{
+				"user_id":  userID,
+				"username": username,
+				"role":     role,
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
+	})
 
-    // /dep_work 경로에서 dep_work.html 서빙
-    r.GET("/dep_work", func(c *gin.Context) {
-        c.HTML(http.StatusOK, "dep_work.html", nil)
-    })
+	finalHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("요청 경로: %s, 메서드: %s", r.URL.Path, r.Method)
 
-    // API 1: 모든 부서 이름 목록 조회
-    r.GET("/api/departments", func(c *gin.Context) {
-        // 부서 이름 목록을 JSON으로 반환
-        c.JSON(http.StatusOK, gin.H{
-            "departments": departments,
-        })
-    })
+		// 공개 API (인증 없이 접근 가능)
+		if r.URL.Path == "/api/login" || r.URL.Path == "/api/register" ||
+			r.URL.Path == "/api/jwt/login" || r.URL.Path == "/api/jwt/register" ||
+			r.URL.Path == "/api/refresh" {
+			log.Printf("공개 API 접근: %s", r.URL.Path)
+			middleware.EnableCORS(publicMux).ServeHTTP(w, r)
+			return
+		}
 
-    // API 2: 모든 부서의 업무현황 조회
-    r.GET("/api/departments/status", func(c *gin.Context) {
-        // 부서별 업무현황 리스트를 JSON으로 반환
-        c.JSON(http.StatusOK, departmentStatuses)
-    })
+		// 인증이 필요한 API
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			log.Printf("인증 필요 API 접근: %s", r.URL.Path)
+			middleware.EnableCORS(middleware.DualAuthMiddleware(privateMux)).ServeHTTP(w, r)
+			return
+		}
 
-    // API 3: 특정 부서의 업무현황 조회
-    r.GET("/api/departments/status/:name", func(c *gin.Context) {
-        name := c.Param("name")
-        for _, dept := range departmentStatuses {
-            if dept.DepartmentName == name {
-                // 배열 형태로 반환 (프론트가 반복문으로 처리 가능)
-                c.JSON(http.StatusOK, []DepartmentStatus{dept})
-                return
-            }
-        }
-        c.JSON(http.StatusNotFound, gin.H{"error": "해당 부서를 찾을 수 없습니다"})
-    })
-    // API 4: 구성원 목록 조회
-    r.GET("/api/members", func(c *gin.Context) {
-        // 구성원 이름 목록을 JSON으로 반환
-        c.JSON(http.StatusOK, gin.H{
-            "members": []string{"홍길동", "김영희"},
-        })
-    })
+		// 정적 파일
+		http.FileServer(http.Dir(".")).ServeHTTP(w, r)
+	})
 
-    // HTTP 서버 실행 (localhost:8080)
-    r.Run(":8080")
+	log.Println("API 서버가 http://localhost:8080 에서 실행 중입니다...")
+	log.Println("/api/login, /api/register, /api/jwt/login, /api/jwt/register, /api/refresh는 인증 없이 접근 가능합니다.")
+	log.Println("그 외 모든 /api/* 엔드포인트는 세션+JWT 복합 인증이 필요합니다.")
+	log.Println("로그인(/api/login) 시 세션+JWT가 모두 발급됩니다.")
+	log.Println("프론트엔드에서 세션 쿠키와 JWT 토큰을 모두 전송해야 API 접근이 가능합니다.")
+
+	log.Fatal(http.ListenAndServe(":8080", finalHandler))
 }
