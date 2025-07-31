@@ -1,15 +1,13 @@
 package handlers
 
 import (
+	"BACK/config"
+	"BACK/models"
+	"BACK/utils"
 	"database/sql"
 	"encoding/json"
 	"log"
 	"net/http"
-
-	"BACK/config"
-	"BACK/middleware"
-	"BACK/models"
-	"BACK/utills"
 )
 
 // HandleLogin은 로그인 요청을 처리하는 핸들러 함수입니다
@@ -52,7 +50,7 @@ func HandleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 비밀번호 검증
-	passwordValid := utills.CheckPasswordWithSalt(loginData.Password, salt, storedPassword)
+	passwordValid := utils.CheckPasswordWithSalt(loginData.Password, salt, storedPassword)
 
 	if !passwordValid {
 		log.Println("비밀번호 불일치")
@@ -91,7 +89,7 @@ func HandleLogin(w http.ResponseWriter, r *http.Request) {
 
 	// Access Token 생성
 	log.Printf("Access Token 생성 시작: userID=%d, userid=%s, role=%s", user.ID, user.Userid, user.Role)
-	accessToken, err := utills.GenerateAccessToken(user.ID, user.Userid, user.Role)
+	accessToken, err := utils.GenerateAccessToken(user.ID, user.Userid, user.Role)
 	if err != nil {
 		log.Printf("Access Token 생성 실패: %v", err)
 		http.Error(w, "토큰 생성 실패", http.StatusInternalServerError)
@@ -101,7 +99,7 @@ func HandleLogin(w http.ResponseWriter, r *http.Request) {
 
 	// Refresh Token 생성
 	log.Printf("Refresh Token 생성 시작: userID=%d, userid=%s", user.ID, user.Userid)
-	refreshToken, err := utills.GenerateRefreshToken(user.ID, user.Userid)
+	refreshToken, err := utils.GenerateRefreshToken(user.ID, user.Userid)
 	if err != nil {
 		log.Printf("Refresh Token 생성 실패: %v", err)
 		http.Error(w, "토큰 생성 실패", http.StatusInternalServerError)
@@ -137,7 +135,7 @@ func HandleLogin(w http.ResponseWriter, r *http.Request) {
 // HandleLogout은 로그아웃 요청을 처리하는 핸들러 함수입니다
 func HandleLogout(w http.ResponseWriter, r *http.Request) {
 	// 세션 가져오기
-	store := middleware.GetSessionStore()
+	store := config.Store // Assuming config.Store is the session store
 	session, err := store.Get(r, "user-session")
 	if err != nil {
 		log.Printf("세션 가져오기 실패: %v", err)
@@ -194,7 +192,7 @@ func HandleRefreshToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Refresh Token으로 새로운 Access Token 생성
-	newAccessToken, err := utills.RefreshAccessToken(refreshToken)
+	newAccessToken, err := utils.RefreshAccessToken(refreshToken)
 	if err != nil {
 		log.Printf("Access Token 갱신 실패: %v", err)
 		http.Error(w, "Token refresh failed", http.StatusUnauthorized)
@@ -202,7 +200,7 @@ func HandleRefreshToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Refresh Token에서 사용자 정보 추출
-	userID, username, err := utills.GetUserInfoFromRefreshToken(refreshToken)
+	userID, username, err := utils.GetUserInfoFromRefreshToken(refreshToken)
 	if err != nil {
 		log.Printf("Refresh Token에서 사용자 정보 추출 실패: %v", err)
 		http.Error(w, "Invalid refresh token", http.StatusUnauthorized)
@@ -210,7 +208,7 @@ func HandleRefreshToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 새로운 Refresh Token 생성
-	newRefreshToken, err := utills.GenerateRefreshToken(userID, username)
+	newRefreshToken, err := utils.GenerateRefreshToken(userID, username)
 	if err != nil {
 		log.Printf("새 Refresh Token 생성 실패: %v", err)
 		// Access Token만 반환

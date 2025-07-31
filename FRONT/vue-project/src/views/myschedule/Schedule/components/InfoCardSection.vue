@@ -119,7 +119,7 @@
       </UploadBtn>
       <SalaryYears>
         <SalaryYear 
-          v-for="year in Object.keys(salaryStatements).sort().reverse()" 
+          v-for="year in Object.keys(salaryStatements).sort((a, b) => parseInt(b) - parseInt(a))" 
           :key="year"
           :class="{ 'active': selectedSalaryYear === year }"
         >
@@ -266,6 +266,7 @@ export default {
         fileName: ''
       },
       salaryStatements: {},
+      salaryUpdateInterval: null, // 자동 업데이트 인터벌
       
       // 연차 정보
       totalLeave: 0,
@@ -381,12 +382,9 @@ export default {
     async loadSalaryStatements() {
       try {
         console.log('[loadSalaryStatements] 급여명세서 목록 로드 시작');
-        console.log('[loadSalaryStatements] 현재 salaryStatements:', this.salaryStatements);
         
         // 로그인 상태 확인
         const userStr = localStorage.getItem('user');
-        console.log('[loadSalaryStatements] localStorage user:', userStr);
-        
         if (!userStr) {
           console.error('[loadSalaryStatements] 로그인 정보가 없습니다');
           return;
@@ -396,35 +394,25 @@ export default {
         const userId = user.id;
         
         console.log('[loadSalaryStatements] 사용자 ID:', userId);
-        console.log('[loadSalaryStatements] 급여명세서 목록 요청 URL:', `/api/salary/list?user_id=${userId}`);
         
         // API 호출하여 급여명세서 목록 가져오기
         const response = await api.get(`/api/salary/list?user_id=${userId}`);
         
-        console.log('[loadSalaryStatements] 급여명세서 목록 응답 상태:', response.status);
-        console.log('[loadSalaryStatements] 급여명세서 목록 응답 헤더:', response.headers);
+        console.log('[loadSalaryStatements] 급여명세서 목록 응답:', response.status);
         
         const result = response.data;
         console.log('[loadSalaryStatements] 급여명세서 목록 결과:', result);
-        console.log('[loadSalaryStatements] result.success:', result.success);
-        console.log('[loadSalaryStatements] result.data:', result.data);
-        console.log('[loadSalaryStatements] result.data 길이:', result.data ? result.data.length : 'undefined');
         
         if (result.success && result.data) {
           // 서버 데이터를 프론트엔드 형식으로 변환
           const statements = {};
-          console.log('[loadSalaryStatements] 데이터 변환 시작');
           
-          result.data.forEach((item, index) => {
-            console.log(`[loadSalaryStatements] 아이템 ${index}:`, item);
+          result.data.forEach((item) => {
             const year = item.year.toString();
             const month = item.month.toString();
             
-            console.log(`[loadSalaryStatements] year: ${year}, month: ${month}`);
-            
             if (!statements[year]) {
               statements[year] = {};
-              console.log(`[loadSalaryStatements] ${year}년 객체 생성`);
             }
             
             statements[year][month] = {
@@ -433,36 +421,51 @@ export default {
               year: item.year,
               month: item.month
             };
-            
-            console.log(`[loadSalaryStatements] ${year}년 ${month}월 데이터 설정:`, statements[year][month]);
           });
           
           console.log('[loadSalaryStatements] 변환된 statements:', statements);
           this.salaryStatements = statements;
-          console.log('[loadSalaryStatements] this.salaryStatements 업데이트 완료:', this.salaryStatements);
-          console.log('[loadSalaryStatements] Object.keys(this.salaryStatements):', Object.keys(this.salaryStatements));
+          
+          // 첫 번째 년도를 자동으로 선택
+          const years = Object.keys(statements).sort((a, b) => parseInt(b) - parseInt(a));
+          if (years.length > 0 && !this.selectedSalaryYear) {
+            this.selectedSalaryYear = years[0];
+          }
+          
+          console.log('[loadSalaryStatements] 급여명세서 로드 완료:', {
+            statements: this.salaryStatements,
+            selectedYear: this.selectedSalaryYear,
+            years: years
+          });
         } else {
           console.log('[loadSalaryStatements] 성공하지 않았거나 데이터가 없음');
+          this.salaryStatements = {};
         }
       } catch (error) {
         console.error('[loadSalaryStatements] 급여명세서 목록 로드 오류:', error);
-        console.error('[loadSalaryStatements] 오류 상세:', error.response ? error.response.data : '응답 없음');
-        console.error('[loadSalaryStatements] 오류 상태:', error.response ? error.response.status : '상태 없음');
+        this.salaryStatements = {};
       }
     },
     
-    toggleSalaryYear(year) {
+    async toggleSalaryYear(year) {
+      console.log('[toggleSalaryYear] 토글 요청:', year, '현재 선택된 년도:', this.selectedSalaryYear);
       if (this.selectedSalaryYear === year) {
         this.selectedSalaryYear = null;
       } else {
         this.selectedSalaryYear = year;
+        // 년도를 선택할 때 목록 자동 업데이트
+        console.log('[toggleSalaryYear] 년도 선택 시 목록 자동 업데이트 시작');
+        await this.loadSalaryStatements();
+        console.log('[toggleSalaryYear] 목록 자동 업데이트 완료');
       }
-      this.$emit('privacy-changed');
+      console.log('[toggleSalaryYear] 토글 후 선택된 년도:', this.selectedSalaryYear);
     },
     
     getSalaryMonths(year) {
       if (!this.salaryStatements[year]) return [];
-      return Object.keys(this.salaryStatements[year]).sort((a, b) => parseInt(a) - parseInt(b));
+      const months = Object.keys(this.salaryStatements[year]);
+      // 월을 숫자 순서대로 정렬 (1, 2, 3, ..., 12)
+      return months.sort((a, b) => parseInt(a) - parseInt(b));
     },
     
     handleFileChange(event) {
@@ -542,6 +545,12 @@ export default {
         window.URL.revokeObjectURL(url);
         
         console.log('[downloadSalaryStatement] 급여명세서 다운로드 완료');
+        
+        // 다운로드 완료 후 목록 자동 업데이트
+        console.log('[downloadSalaryStatement] 목록 자동 업데이트 시작');
+        await this.loadSalaryStatements();
+        console.log('[downloadSalaryStatement] 목록 자동 업데이트 완료');
+        
       } catch (error) {
         console.error('[downloadSalaryStatement] 급여명세서 다운로드 오류:', error);
         if (error.response && error.response.status === 404) {
@@ -552,7 +561,7 @@ export default {
       }
     },
     
-    downloadAllStatements(year) {
+    async downloadAllStatements(year) {
       if (!this.salaryStatements[year] || Object.keys(this.salaryStatements[year]).length === 0) {
         alert('해당 년도의 급여명세서가 없습니다.');
         return;
@@ -561,20 +570,54 @@ export default {
       const months = this.getSalaryMonths(year);
       alert(`${year}년 모든 급여명세서(${months.length}개)를 다운로드합니다.`);
       
-      setTimeout(() => {
-        months.forEach((month, index) => {
-          setTimeout(() => {
-            const statement = this.salaryStatements[year][month];
-            const link = document.createElement('a');
-            link.href = statement.url;
-            link.download = statement.fileName;
-            link.target = '_blank';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-          }, index * 500);
-        });
-      }, 100);
+      // 로그인 상태 확인
+      const userStr = localStorage.getItem('user');
+      if (!userStr) {
+        alert('로그인 정보가 없습니다.');
+        return;
+      }
+      
+      const user = JSON.parse(userStr);
+      const userId = user.id;
+      
+      // 각 월별로 순차적으로 다운로드
+      for (let i = 0; i < months.length; i++) {
+        const month = months[i];
+        try {
+          console.log(`[downloadAllStatements] ${year}년 ${month}월 다운로드 시작`);
+          
+          const response = await api.get(`/api/salary/statement?user_id=${userId}&year=${year}&month=${month}`, {
+            responseType: 'blob'
+          });
+          
+          const blob = new Blob([response.data], { type: 'application/pdf' });
+          const url = window.URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `급여명세서_${year}년_${month}월.pdf`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(url);
+          
+          console.log(`[downloadAllStatements] ${year}년 ${month}월 다운로드 완료`);
+          
+          // 다음 다운로드 전에 잠시 대기
+          if (i < months.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        } catch (error) {
+          console.error(`[downloadAllStatements] ${year}년 ${month}월 다운로드 오류:`, error);
+          alert(`${year}년 ${month}월 급여명세서 다운로드 중 오류가 발생했습니다.`);
+        }
+      }
+      
+      console.log(`[downloadAllStatements] ${year}년 모든 급여명세서 다운로드 완료`);
+      
+      // 모든 다운로드 완료 후 목록 자동 업데이트
+      console.log('[downloadAllStatements] 목록 자동 업데이트 시작');
+      await this.loadSalaryStatements();
+      console.log('[downloadAllStatements] 목록 자동 업데이트 완료');
     }
   }
 };

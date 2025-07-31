@@ -1,14 +1,13 @@
 package handlers
 
 import (
+	"BACK/config"
+	"BACK/models"
+	"BACK/utils"
 	"database/sql"
 	"encoding/json"
 	"log"
 	"net/http"
-
-	"BACK/config"
-	"BACK/models"
-	"BACK/utills"
 )
 
 // JWTLoginRequest는 JWT 로그인 요청 구조체입니다
@@ -65,7 +64,7 @@ func HandleJWTLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 비밀번호 검증
-	passwordValid := utills.CheckPasswordWithSalt(loginData.Password, salt, storedPassword)
+	passwordValid := utils.CheckPasswordWithSalt(loginData.Password, salt, storedPassword)
 
 	if !passwordValid {
 		log.Println("비밀번호 불일치")
@@ -77,7 +76,7 @@ func HandleJWTLogin(w http.ResponseWriter, r *http.Request) {
 	log.Printf("JWT 로그인 성공: %s (%s)", user.Userid, user.Name)
 
 	// JWT 토큰 생성
-	token, err := utills.GenerateJWT(user.ID, user.Userid, user.Role)
+	token, err := utils.GenerateJWT(user.ID, user.Userid, user.Role)
 	if err != nil {
 		log.Printf("JWT 토큰 생성 실패: %v", err)
 		http.Error(w, "토큰 생성 실패", http.StatusInternalServerError)
@@ -122,7 +121,7 @@ func HandleTokenRefresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tokenString, err := utills.ExtractTokenFromHeader(authHeader)
+	tokenString, err := utils.ExtractTokenFromHeader(authHeader)
 	if err != nil {
 		log.Printf("토큰 추출 실패: %v", err)
 		http.Error(w, "Invalid authorization header format", http.StatusUnauthorized)
@@ -130,7 +129,7 @@ func HandleTokenRefresh(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 토큰 갱신
-	newToken, err := utills.RefreshJWT(tokenString)
+	newToken, err := utils.RefreshJWT(tokenString)
 	if err != nil {
 		log.Printf("토큰 갱신 실패: %v", err)
 		http.Error(w, "Token refresh failed", http.StatusUnauthorized)
@@ -164,7 +163,7 @@ func HandleVerifyToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tokenString, err := utills.ExtractTokenFromHeader(authHeader)
+	tokenString, err := utils.ExtractTokenFromHeader(authHeader)
 	if err != nil {
 		log.Printf("토큰 추출 실패: %v", err)
 		http.Error(w, "Invalid authorization header format", http.StatusUnauthorized)
@@ -172,7 +171,7 @@ func HandleVerifyToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 토큰 검증
-	claims, err := utills.ValidateJWT(tokenString)
+	claims, err := utils.ValidateJWT(tokenString)
 	if err != nil {
 		log.Printf("토큰 검증 실패: %v", err)
 		http.Error(w, "Invalid or expired token", http.StatusUnauthorized)

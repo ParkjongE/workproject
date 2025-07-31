@@ -1,12 +1,11 @@
 package middleware
 
 import (
+	"BACK/config"
+	"BACK/utils"
 	"context"
 	"log"
 	"net/http"
-
-	"BACK/config"
-	"BACK/utills"
 )
 
 // DualAuthMiddleware는 세션과 JWT가 모두 유효해야 인증 성공
@@ -47,14 +46,14 @@ func DualAuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		tokenString, err := utills.ExtractTokenFromHeader(authHeader)
+		tokenString, err := utils.ExtractTokenFromHeader(authHeader)
 		if err != nil {
 			log.Printf("[DualAuth] JWT 추출 실패: %v", err)
 			http.Error(w, "JWT 인증 필요", http.StatusUnauthorized)
 			return
 		}
 
-		claims, err := utills.ValidateJWT(tokenString)
+		claims, err := utils.ValidateJWT(tokenString)
 		if err != nil {
 			log.Printf("[DualAuth] JWT 검증 실패: %v", err)
 			http.Error(w, "JWT 인증 필요", http.StatusUnauthorized)

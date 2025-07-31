@@ -1,19 +1,19 @@
 package main
 
 import (
+	"BACK/config"
+	"BACK/handlers"
+	"BACK/middleware"
+	"BACK/utils"
 	"encoding/json"
 	"log"
 	"net/http"
 	"strings"
-
-	"BACK/config"
-	"BACK/handlers"
-	"BACK/middleware"
-	"BACK/utills"
 )
 
 func main() {
-	utills.InitJWTSecret()
+	// JWT 시크릿 초기화
+	utils.InitJWTSecret()
 	config.InitDB()
 	defer config.DB.Close()
 

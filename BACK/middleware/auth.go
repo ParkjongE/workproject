@@ -1,11 +1,10 @@
 package middleware
 
 import (
+	"BACK/utils"
 	"context"
 	"log"
 	"net/http"
-
-	"BACK/utills"
 )
 
 // UserContextKey는 컨텍스트에서 사용자 정보를 저장할 때 사용하는 키입니다
@@ -35,7 +34,7 @@ func JWTAuthMiddleware(next http.Handler) http.Handler {
 		}
 
 		// Bearer 토큰 추출
-		tokenString, err := utills.ExtractTokenFromHeader(authHeader)
+		tokenString, err := utils.ExtractTokenFromHeader(authHeader)
 		if err != nil {
 			log.Printf("토큰 추출 실패: %v", err)
 			http.Error(w, "Invalid authorization header format", http.StatusUnauthorized)
@@ -43,7 +42,7 @@ func JWTAuthMiddleware(next http.Handler) http.Handler {
 		}
 
 		// JWT 토큰 검증
-		claims, err := utills.ValidateJWT(tokenString)
+		claims, err := utils.ValidateJWT(tokenString)
 		if err != nil {
 			log.Printf("JWT 토큰 검증 실패: %v", err)
 			http.Error(w, "Invalid or expired token", http.StatusUnauthorized)
@@ -111,7 +110,7 @@ func OptionalJWTAuthMiddleware(next http.Handler) http.Handler {
 		}
 
 		// Bearer 토큰 추출
-		tokenString, err := utills.ExtractTokenFromHeader(authHeader)
+		tokenString, err := utils.ExtractTokenFromHeader(authHeader)
 		if err != nil {
 			// 토큰 형식이 잘못되어도 통과 (선택적 인증이므로)
 			log.Printf("토큰 형식 오류 (선택적 인증): %v", err)
@@ -120,7 +119,7 @@ func OptionalJWTAuthMiddleware(next http.Handler) http.Handler {
 		}
 
 		// JWT 토큰 검증
-		claims, err := utills.ValidateJWT(tokenString)
+		claims, err := utils.ValidateJWT(tokenString)
 		if err != nil {
 			// 토큰이 유효하지 않아도 통과 (선택적 인증이므로)
 			log.Printf("토큰 검증 실패 (선택적 인증): %v", err)

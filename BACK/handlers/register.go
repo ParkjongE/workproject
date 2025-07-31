@@ -12,7 +12,7 @@ import (
 
 	"BACK/config"
 	"BACK/models"
-	"BACK/utills"
+	"BACK/utils"
 )
 
 // HandleRegister는 사용자 등록 요청을 처리하는 핸들러 함수입니다
@@ -205,7 +205,7 @@ func HandleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 1. 솔트 생성
-	salt, err := utills.GenerateSalt(32)
+	salt, err := utils.GenerateSalt(32)
 	if err != nil {
 		log.Println("솔트 생성 오류:", err)
 		http.Error(w, "서버 오류", http.StatusInternalServerError)
@@ -213,7 +213,7 @@ func HandleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 2. 비밀번호와 솔트를 결합하여 해싱
-	hashedPassword, err := utills.HashPasswordWithSalt(user.Password, salt)
+	hashedPassword, err := utils.HashPasswordWithSalt(user.Password, salt)
 	if err != nil {
 		log.Println("비밀번호 해싱 오류:", err)
 		http.Error(w, "서버 오류", http.StatusInternalServerError)

@@ -160,9 +160,9 @@ func GetSalaryStatementList(w http.ResponseWriter, r *http.Request) {
 		if !entry.IsDir() && strings.HasPrefix(entry.Name(), prefix) && strings.HasSuffix(entry.Name(), ".pdf") {
 			// 파일명에서 년도와 월 추출 (salary_statement_1_2024_3.pdf)
 			parts := strings.Split(strings.TrimSuffix(entry.Name(), ".pdf"), "_")
-			if len(parts) >= 4 {
-				year, _ := strconv.Atoi(parts[2])
-				month, _ := strconv.Atoi(parts[3])
+			if len(parts) >= 5 {
+				year, _ := strconv.Atoi(parts[3])  // parts[3] = 2024
+				month, _ := strconv.Atoi(parts[4]) // parts[4] = 3
 
 				// 파일 정보 가져오기
 				filePath := filepath.Join(salaryDir, entry.Name())
