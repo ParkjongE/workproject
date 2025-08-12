@@ -2,34 +2,26 @@ package utils
 
 import (
 	"crypto/rand"
-	"encoding/base64"
-
-	"golang.org/x/crypto/bcrypt"
+	"crypto/sha256"
+	"encoding/hex"
 )
 
-// GenerateSalt는 임의의 솔트를 생성하는 함수입니다
-func GenerateSalt(length int) (string, error) {
-	b := make([]byte, length)
-	_, err := rand.Read(b)
-	if err != nil {
-		return "", err
-	}
-	return base64.StdEncoding.EncodeToString(b), nil
+// GenerateSalt 랜덤 salt 생성 (32바이트)
+func GenerateSalt() string {
+	salt := make([]byte, 32)
+	rand.Read(salt)
+	return hex.EncodeToString(salt)
 }
 
-// HashPasswordWithSalt는 비밀번호와 솔트를 결합하여 해싱하는 함수입니다
-func HashPasswordWithSalt(password string, salt string) (string, error) {
-	// 솔트와 비밀번호를 합쳐서 해싱
-	saltedPassword := password + salt
-	bytes, err := bcrypt.GenerateFromPassword([]byte(saltedPassword), 14)
-	return string(bytes), err
+// HashPassword 비밀번호에 salt를 추가하여 SHA-256으로 해싱
+func HashPassword(password, salt string) string {
+	hash := sha256.New()
+	hash.Write([]byte(password + salt))
+	return hex.EncodeToString(hash.Sum(nil))
 }
 
-// CheckPasswordWithSalt는 솔트를 사용하여 비밀번호와 해시를 비교하는 함수입니다
-func CheckPasswordWithSalt(password string, salt string, hash string) bool {
-	saltedPassword := password + salt
-	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(saltedPassword))
-	return err == nil
+// VerifyPassword 비밀번호 검증
+func VerifyPassword(password, salt, hashedPassword string) bool {
+	expectedHash := HashPassword(password, salt)
+	return expectedHash == hashedPassword
 }
-
-//공통 유틸리티 함수 모음  , 프로젝트 전역에서 자주 쓰는 기능들을 한데 모음

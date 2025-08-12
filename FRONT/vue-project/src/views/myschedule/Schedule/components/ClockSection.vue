@@ -4,7 +4,15 @@
       <ClockHeaderTitle>{{ selectedDate ? formatDate(selectedDate) : '오늘' }}의 일정</ClockHeaderTitle>
     </ClockHeader>
     <ClockView>
-      <ClockFace class="clock-face" @click="onClockFaceClick($event)">
+      <ClockFace 
+        class="clock-face" 
+        @click="onClockFaceClick($event)"
+        @mousedown="onDragStart($event)"
+        @mousemove="onDragMove($event)"
+        @mouseup="onDragEnd($event)"
+        @mouseleave="onDragEnd($event)"
+        style="user-select: none;"
+      >
         <!-- 시간 숫자 -->
         <HourNumber v-for="hour in 12" :key="`hour-${hour}`" :style="getHourNumberStyle(hour)">
           {{ hour }}
@@ -19,6 +27,11 @@
           :class="{ selected: getTimeSlotSelected(hour) }"
         >
         </TimeSlot>
+        <!-- 🔥 드래그 선택 영역 -->
+        <DragSelection 
+          v-show="isDragging"
+          :style="getDragSelectionStyle()"
+        />
         <!-- 일정 세그먼트 -->
         <ScheduleSegment
           v-for="(schedule, idx) in daySchedules"
@@ -61,6 +74,7 @@
                 <input
                   type="time"
                   v-model="quickAddForm.startTime"
+                  step="900"
                   required
                   style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:14px;"
                 />
@@ -71,6 +85,7 @@
                 <input
                   type="time"
                   v-model="quickAddForm.endTime"
+                  step="900"
                   required
                   style="width:100%;padding:6px;border:1px solid #ddd;border-radius:4px;font-size:14px;"
                 />
@@ -178,6 +193,13 @@ export default {
       quickAddForm,
       colorOptions,
       colorAnimationActive,
+      // 🔥 드래그 관련 추가
+      isDragging,
+      selectedTimeRange,
+      onDragStart,
+      onDragMove,
+      onDragEnd,
+      getDragSelectionStyle,
       getHourNumberStyle,
       getScheduleSegmentStyle,
       getTimeSlotStyle,
@@ -349,6 +371,13 @@ export default {
       quickAddForm,
       colorOptions,
       colorAnimationActive,
+      // 🔥 드래그 관련 추가
+      isDragging,
+      selectedTimeRange,
+      onDragStart,
+      onDragMove,
+      onDragEnd,
+      getDragSelectionStyle,
       getHourNumberStyle,
       getScheduleSegmentStyle,
       getTimeSlotStyle,

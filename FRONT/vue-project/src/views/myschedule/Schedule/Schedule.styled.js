@@ -135,6 +135,16 @@ export const ClockCenter = styled.div`
   border: 3px solid #fff;
 `;
 
+// 🔥 드래그 선택 영역 스타일
+export const DragSelection = styled.div`
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 1;
+  transition: opacity 0.1s ease;
+  border: 2px solid rgba(76, 175, 80, 0.6);
+`;
+
 export const ScheduleSegment = styled.div`
   position: absolute;
   left: 50%;

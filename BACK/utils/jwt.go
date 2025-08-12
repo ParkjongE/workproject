@@ -2,10 +2,13 @@ package utils
 
 import (
 	"errors"
+	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -271,4 +274,63 @@ func RefreshJWT(tokenString string) (string, error) {
 	}
 
 	return newToken, nil
+}
+
+// ExtractUserIDFromToken JWT 토큰에서 사용자 ID 추출
+func ExtractUserIDFromToken(r *http.Request) (int, error) {
+	fmt.Println("=== ExtractUserIDFromToken 시작 ===")
+
+	// Authorization 헤더에서 토큰 추출
+	authHeader := r.Header.Get("Authorization")
+	fmt.Printf("Authorization 헤더: %s\n", authHeader)
+
+	if authHeader == "" {
+		fmt.Println("Authorization 헤더가 없음")
+		return 0, fmt.Errorf("Authorization header missing")
+	}
+
+	// "Bearer " 제거
+	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+	fmt.Printf("토큰 문자열: %s...\n", tokenString[:20]) // 보안을 위해 일부만 로그
+
+	if tokenString == authHeader {
+		fmt.Println("잘못된 토큰 형식")
+		return 0, fmt.Errorf("Invalid token format")
+	}
+
+	// JWT 토큰 파싱 및 검증
+	fmt.Println("JWT 토큰 파싱 시작")
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		// .env 파일에서 시크릿 키 가져오기 (이 부분 수정!)
+		return []byte(getJWTSecret()), nil
+	})
+
+	if err != nil {
+		fmt.Printf("토큰 파싱 오류: %v\n", err)
+		return 0, fmt.Errorf("Token parsing error: %v", err)
+	}
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		fmt.Printf("토큰 클레임: %+v\n", claims)
+		if userID, ok := claims["user_id"].(float64); ok {
+			fmt.Printf("사용자 ID 추출 성공: %d\n", int(userID))
+			return int(userID), nil
+		}
+		fmt.Println("토큰에서 user_id를 찾을 수 없음")
+		return 0, fmt.Errorf("User ID not found in token")
+	}
+
+	fmt.Println("토큰이 유효하지 않음")
+	return 0, fmt.Errorf("Invalid token")
+}
+
+// getJWTSecret JWT 시크릿 키 가져오기
+func getJWTSecret() string {
+	secret := os.Getenv("JWT_SECRET_KEY")
+	if secret == "" {
+		// 기본값 설정 (보안상 권장하지 않음)
+		secret = "default-secret-key"
+		fmt.Println("Warning: JWT_SECRET_KEY not found in .env, using default")
+	}
+	return secret
 }

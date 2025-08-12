@@ -174,6 +174,12 @@ export default {
       attendanceStore
     }
   },
+  beforeMount() {
+    // 컴포넌트 마운트 전에 스토어 초기화 확인
+    if (!this.attendanceStore) {
+      console.error('Attendance store가 초기화되지 않았습니다.')
+    }
+  },
   data() {
     return {
       isLoading: false,
@@ -189,19 +195,29 @@ export default {
   computed: {
     // 스토어에서 가져온 데이터
     checkInTime() {
-      return this.attendanceStore.todayAttendance.value?.checkInTime || null
+      const todayAttendance = this.attendanceStore?.todayAttendance?.value
+      console.log('[checkInTime computed] todayAttendance 전체:', todayAttendance)
+      const time = todayAttendance?.checkInTime
+      console.log('[checkInTime computed] time:', time, 'type:', typeof time)
+      return (time && time !== 'null' && time !== '') ? time : null
     },
     checkOutTime() {
-      return this.attendanceStore.todayAttendance.value?.checkOutTime || null
+      const time = this.attendanceStore?.todayAttendance?.value?.checkOutTime
+      console.log('[checkOutTime computed] time:', time, 'type:', typeof time)
+      return (time && time !== 'null' && time !== '') ? time : null
     },
     isCheckedIn() {
-      return !!this.attendanceStore.todayAttendance.value?.checkInTime
+      const checkInTime = this.checkInTime
+      console.log('[isCheckedIn] checkInTime:', checkInTime, 'type:', typeof checkInTime, 'result:', !!checkInTime)
+      return !!checkInTime
     },
     isCheckedOut() {
-      return !!this.attendanceStore.todayAttendance.value?.checkOutTime
+      const checkOutTime = this.checkOutTime
+      console.log('[isCheckedOut] checkOutTime:', checkOutTime, 'type:', typeof checkOutTime, 'result:', !!checkOutTime)
+      return !!checkOutTime
     },
     attendanceHistory() {
-      return this.attendanceStore.attendanceRecords.value.map(record => ({
+      return (this.attendanceStore?.attendanceRecords?.value || []).map(record => ({
         date: record.date,
         checkIn: record.checkInTime,
         checkOut: record.checkOutTime,
@@ -219,6 +235,9 @@ export default {
       const weekDays = ['일', '월', '화', '수', '목', '금', '토']
       const weekData = []
       
+      // 🔴 디버깅 로그 추가
+      console.log('[weekData] attendanceRecords:', this.attendanceStore?.attendanceRecords?.value)
+      
       for (let i = 0; i < 7; i++) {
         const date = new Date(startOfWeek)
         date.setDate(startOfWeek.getDate() + i)
@@ -229,8 +248,9 @@ export default {
         const isToday = dateStr === today.toISOString().split('T')[0]
         const isWeekend = date.getDay() === 0 || date.getDay() === 6
         
-        // 해당 날짜의 출퇴근 기록 찾기
-        const record = this.attendanceStore.attendanceRecords.value.find(r => r.date === dateStr)
+        // 해당 날짜의 출퇴근 기록 찾기 (로깅 추가)
+        const record = (this.attendanceStore?.attendanceRecords?.value || []).find(r => r.date === dateStr)
+        console.log(`[weekData] ${dateStr} 날짜 찾기:`, record)
         
         let status = 'no-record'
         let statusText = '기록없음'
@@ -239,6 +259,7 @@ export default {
           status = 'weekend'
           statusText = '주말'
         } else if (record) {
+          console.log(`[weekData] ${dateStr} 레코드 발견:`, record)
           if (record.checkInTime && record.checkOutTime) {
             status = 'checked-out'
             statusText = '퇴근'
@@ -347,7 +368,12 @@ export default {
   },
   async mounted() {
     // 컴포넌트 마운트 시 출퇴근 데이터 초기화
+    console.log('[mounted] 출퇴근 데이터 초기화 시작')
     await this.attendanceStore.initializeAttendance()
+    console.log('[mounted] 출퇴근 데이터 초기화 완료')
+    console.log('[mounted] todayAttendance:', this.attendanceStore.todayAttendance?.value)
+    console.log('[mounted] isCheckedIn:', this.isCheckedIn)
+    console.log('[mounted] isCheckedOut:', this.isCheckedOut)
   }
 }
 </script>

@@ -72,6 +72,7 @@ const updateCurrentTime = () => {
 
 const checkIn = async () => {
   try {
+    console.log('[checkIn] 함수 시작')
     const userStr = localStorage.getItem('user')
     if (!userStr) {
       alert('로그인 정보가 없습니다. 다시 로그인 해주세요.')
@@ -80,14 +81,19 @@ const checkIn = async () => {
     
     const user = JSON.parse(userStr)
     const user_id = user.id
+    console.log('[checkIn] user_id:', user_id)
 
     // 현재 시간을 ISO 문자열로 전송
     const now = new Date()
-    const response = await api.post('/api/attendance/checkin', {
+    const payload = {
       user_id: parseInt(user_id),
       date: now.toISOString().split('T')[0],
       check_in_time: now.toISOString()
-    })
+    }
+    console.log('[checkIn] 요청 payload:', payload)
+    console.log('[checkIn] 요청 URL: /api/attendance/checkin')
+    
+    const response = await api.post('/api/attendance/checkin', payload)
 
     if (response.data.success) {
       // 출퇴근 기록 다시 로드하여 최신 데이터 반영
@@ -108,6 +114,9 @@ const checkIn = async () => {
     }
   } catch (error) {
     console.error('[checkIn] 오류:', error)
+    console.error('[checkIn] 오류 상세:', error.response?.data)
+    console.error('[checkIn] 상태 코드:', error.response?.status)
+    console.error('[checkIn] 요청 설정:', error.config)
     if (error.response?.status === 409) {
       alert('이미 출근 기록이 있습니다.')
     } else {
@@ -175,34 +184,47 @@ const loadAttendanceByDate = async (date) => {
     const user = JSON.parse(userStr)
     const user_id = user.id
 
-    console.log('[loadAttendanceByDate] 요청 URL:', `/api/attendance/date/${user_id}/${date}`)
-    const response = await api.get(`/api/attendance/date/${user_id}/${date}`)
+    const url = `/api/attendance/date?user_id=${user_id}&date=${date}`
+    console.log('[loadAttendanceByDate] 요청 URL:', url)
+    const response = await api.get(url)
     
-    console.log('[loadAttendanceByDate] 응답 데이터:', response.data)
+    console.log('[loadAttendanceByDate] 응답:', response.data.work_date, response.data.check_in_time ? '출근시간 있음' : '출근시간 없음')
+    
+    // UTC 시간을 로컬 시간으로 변환
+    const formatTime = (timeString) => {
+      if (!timeString) return null
+      const date = new Date(timeString)
+      return date.toLocaleTimeString('ko-KR', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: false 
+      })
+    }
+
+    console.log('[loadAttendanceByDate] 응답 데이터 전체:', response.data)
     
     if (response.data && response.data.work_date) {
-      // UTC 시간을 로컬 시간으로 변환
-      const formatTime = (timeString) => {
-        if (!timeString) return null
-        const date = new Date(timeString)
-        return date.toLocaleTimeString('ko-KR', { 
-          hour: '2-digit', 
-          minute: '2-digit',
-          hour12: false 
-        })
-      }
-
+      // 기록이 있는 경우 (AttendanceRecord 객체 또는 간단한 객체)
+      const data = response.data
+      console.log('[loadAttendanceByDate] data.check_in_time:', data.check_in_time, 'type:', typeof data.check_in_time)
+      console.log('[loadAttendanceByDate] data.check_out_time:', data.check_out_time, 'type:', typeof data.check_out_time)
+      
+      const hasCheckIn = data.check_in_time && data.check_in_time !== null && data.check_in_time !== 'null'
+      const hasCheckOut = data.check_out_time && data.check_out_time !== null && data.check_out_time !== 'null'
+      
+      console.log('[loadAttendanceByDate] hasCheckIn:', hasCheckIn, 'hasCheckOut:', hasCheckOut)
+      
       attendanceState.todayAttendance = {
-        date: response.data.work_date,
-        checkInTime: formatTime(response.data.check_in_time),
-        checkOutTime: formatTime(response.data.check_out_time),
-        originalCheckInTime: response.data.check_in_time,
-        originalCheckOutTime: response.data.check_out_time,
-        workTime: response.data.check_in_time && response.data.check_out_time ? 
-          formatMinutesToHours((new Date(response.data.check_out_time) - new Date(response.data.check_in_time)) / 1000 / 60) : '',
-        status: response.data.status
+        date: data.work_date,
+        checkInTime: hasCheckIn ? formatTime(data.check_in_time) : null,
+        checkOutTime: hasCheckOut ? formatTime(data.check_out_time) : null,
+        originalCheckInTime: data.check_in_time,
+        originalCheckOutTime: data.check_out_time,
+        workTime: (hasCheckIn && hasCheckOut) ? 
+          formatMinutesToHours((new Date(data.check_out_time) - new Date(data.check_in_time)) / 1000 / 60) : '',
+        status: data.status
       }
-      console.log('[loadAttendanceByDate] todayAttendance 업데이트됨:', attendanceState.todayAttendance)
+      console.log('[loadAttendanceByDate] todayAttendance 업데이트 - checkInTime:', attendanceState.todayAttendance.checkInTime)
     } else {
       // 해당 날짜에 기록이 없는 경우
       attendanceState.todayAttendance = {
@@ -238,10 +260,19 @@ const loadAttendanceRecords = async () => {
     const user_id = user.id
 
     console.log('[loadAttendanceRecords] 요청 URL:', `/api/attendance/records/${user_id}`)
-    console.log('[loadAttendanceRecords] user_id:', user_id, '타입:', typeof user_id)
     const response = await api.get(`/api/attendance/records/${user_id}`)
     
+    console.log('[loadAttendanceRecords] 응답 데이터:', response.data)
+    
     if (response.data) {
+      // 🔴 각 레코드별로 로깅 추가
+      response.data.forEach((record, index) => {
+        console.log(`[loadAttendanceRecords] 레코드 ${index}:`, record)
+        console.log(`[loadAttendanceRecords] 레코드 ${index} date:`, record.date)
+        console.log(`[loadAttendanceRecords] 레코드 ${index} checkInTime:`, record.checkInTime)
+        console.log(`[loadAttendanceRecords] 레코드 ${index} checkOutTime:`, record.checkOutTime)
+      })
+      
       // UTC 시간을 로컬 시간으로 변환
       const formatTime = (timeString) => {
         if (!timeString) return null
@@ -254,13 +285,15 @@ const loadAttendanceRecords = async () => {
       }
 
       attendanceState.attendanceRecords = response.data.map(record => ({
-        date: record.work_date,
-        checkInTime: formatTime(record.check_in_time),
-        checkOutTime: formatTime(record.check_out_time),
-        workHours: record.check_in_time && record.check_out_time ? 
-          (new Date(record.check_out_time) - new Date(record.check_in_time)) / 1000 / 60 / 60 : null,
+        date: record.date,
+        checkInTime: formatTime(record.checkInTime),
+        checkOutTime: formatTime(record.checkOutTime),
+        workHours: record.checkInTime && record.checkOutTime ? 
+          (new Date(record.checkOutTime) - new Date(record.checkInTime)) / 1000 / 60 / 60 : null,
         status: record.status
       }))
+      
+      console.log('[loadAttendanceRecords] 변환된 데이터:', attendanceState.attendanceRecords)
     }
   } catch (error) {
     console.error('[loadAttendanceRecords] 오류:', error)
