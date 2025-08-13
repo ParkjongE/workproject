@@ -19,10 +19,10 @@ export function useSchedule() {
     
     try {
       const res = await api.get(`/api/schedules?user_id=${user_id}`);
-      console.log('[fetchMySchedules] 서버에서 받아온 데이터:', res.data);
+      console.log('[fetchMySchedules] 일정 개수:', res.data?.length || 0);
+      
       // 백엔드 일정 데이터를 프론트 mySchedules 형식에 맞게 변환
-      mySchedules.value = res.data.map(s => {
-        console.log('서버에서 받아온 color:', s.color);
+      mySchedules.value = (res.data || []).map(s => {
         return {
           id: s.schedule_id,
           title: s.title,
@@ -32,8 +32,8 @@ export function useSchedule() {
           description: s.content
         };
       });
-      console.log('[fetchMySchedules] mySchedules.value:', mySchedules.value);
     } catch (err) {
+      console.error('[fetchMySchedules] API 호출 실패:', err);
       mySchedules.value = [];
     }
   };
@@ -54,7 +54,7 @@ export function useSchedule() {
   const deleteSchedule = async (scheduleId) => {
     try {
       console.log('[프론트] DELETE 요청 시작 - Schedule ID:', scheduleId);
-      const response = await api.delete(`/api/schedule/${scheduleId}`);
+      const response = await api.delete(`/api/schedule/delete?schedule_id=${scheduleId}`);
       
       if (response.data.success) {
         console.log('[deleteSchedule] 서버 삭제 성공:', response.data.message);
@@ -85,7 +85,7 @@ export function useSchedule() {
       console.log('[updateSchedule] 수정 요청 시작 - Schedule ID:', scheduleId);
       console.log('[updateSchedule] 수정할 데이터:', updatedData);
       
-      const response = await api.put(`/api/schedule/${scheduleId}`, updatedData);
+      const response = await api.put(`/api/schedule/update?schedule_id=${scheduleId}`, updatedData);
       
       if (response.data.success) {
         console.log('[updateSchedule] 서버 수정 성공:', response.data.message);

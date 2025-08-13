@@ -7,7 +7,7 @@ import (
 // LeaveStatus 사용자 연차 현황 구조체
 type LeaveStatus struct {
 	UserID        int `json:"user_id"`
-	TotalEarned   int `json:"total_earned"`
+	TotalEarned   int `json:"total_earned_days"`
 	UsedDays      int `json:"used_days"`
 	RemainingDays int `json:"remaining_days"`
 }

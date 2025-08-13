@@ -16,11 +16,7 @@ type Attendance struct {
 	CreatedAt    time.Time      `json:"created_at" db:"created_at"`
 }
 
-// AttendanceService 출근 관련 서비스 인터페이스
-type AttendanceService interface {
-	GetAttendance(userID int, startDate, endDate time.Time) ([]Attendance, error)
-	PostAttendance(userID int, date time.Time, action string, timeStr string) error
-}
+
 
 // AttendanceRequest 출근 요청 구조체 (기존)
 type AttendanceRequest struct {

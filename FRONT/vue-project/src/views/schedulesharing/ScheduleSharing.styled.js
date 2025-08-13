@@ -183,10 +183,12 @@ export const MiniDayCell = styled.div`
 
 export const MiniDayNumber = styled.div`
   font-size: 7px;
-  z-index: 3;
+  z-index: 20;
   color: #333;
   position: relative;
   margin-bottom: 3px;
+  text-shadow: 0 0 2px white;
+  font-weight: bold;
 `;
 
 export const MiniDayEvent = styled.div`

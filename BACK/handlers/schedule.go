@@ -73,13 +73,8 @@ func (h *ScheduleHandler) GetSchedulesByUser(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	response := map[string]interface{}{
-		"success": true,
-		"data":    schedules,
-	}
-
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	json.NewEncoder(w).Encode(schedules)
 }
 
 // UpdateSchedule 스케줄 수정
@@ -136,15 +131,15 @@ func (h *ScheduleHandler) DeleteSchedule(w http.ResponseWriter, r *http.Request)
 
 // CreateSchedule 서비스 구현
 func (s *ScheduleServiceImpl) CreateSchedule(schedule *models.Schedule) error {
-	query := "INSERT INTO schedules (user_id, title, description, start_time, end_time, created_at, updated_at) VALUES (?, ?, ?, ?, ?, NOW(), NOW())"
+	query := "INSERT INTO schedules (user_id, title, content, start_time, end_time, color, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())"
 
-	_, err := s.db.Exec(query, schedule.UserID, schedule.Title, schedule.Description, schedule.StartTime, schedule.EndTime)
+	_, err := s.db.Exec(query, schedule.UserID, schedule.Title, schedule.Content, schedule.StartTime, schedule.EndTime, schedule.Color)
 	return err
 }
 
 // GetSchedulesByUser 서비스 구현
 func (s *ScheduleServiceImpl) GetSchedulesByUser(userID string) ([]models.Schedule, error) {
-	query := "SELECT id, user_id, title, description, start_time, end_time, created_at, updated_at FROM schedules WHERE user_id = ? ORDER BY start_time"
+	query := "SELECT schedule_id, user_id, title, content, start_time, end_time, created_at, color FROM schedules WHERE user_id = ? ORDER BY start_time"
 
 	rows, err := s.db.Query(query, userID)
 	if err != nil {
@@ -156,8 +151,8 @@ func (s *ScheduleServiceImpl) GetSchedulesByUser(userID string) ([]models.Schedu
 	for rows.Next() {
 		var schedule models.Schedule
 		err := rows.Scan(
-			&schedule.ID, &schedule.UserID, &schedule.Title, &schedule.Description,
-			&schedule.StartTime, &schedule.EndTime, &schedule.CreatedAt, &schedule.UpdatedAt,
+			&schedule.ScheduleID, &schedule.UserID, &schedule.Title, &schedule.Content,
+			&schedule.StartTime, &schedule.EndTime, &schedule.CreatedAt, &schedule.Color,
 		)
 		if err != nil {
 			return nil, err
@@ -170,15 +165,15 @@ func (s *ScheduleServiceImpl) GetSchedulesByUser(userID string) ([]models.Schedu
 
 // UpdateSchedule 서비스 구현
 func (s *ScheduleServiceImpl) UpdateSchedule(scheduleID string, schedule *models.Schedule) error {
-	query := "UPDATE schedules SET title = ?, description = ?, start_time = ?, end_time = ?, updated_at = NOW() WHERE id = ?"
+	query := "UPDATE schedules SET title = ?, content = ?, start_time = ?, end_time = ?, color = ? WHERE schedule_id = ?"
 
-	_, err := s.db.Exec(query, schedule.Title, schedule.Description, schedule.StartTime, schedule.EndTime, scheduleID)
+	_, err := s.db.Exec(query, schedule.Title, schedule.Content, schedule.StartTime, schedule.EndTime, schedule.Color, scheduleID)
 	return err
 }
 
 // DeleteSchedule 서비스 구현
 func (s *ScheduleServiceImpl) DeleteSchedule(scheduleID string) error {
-	query := "DELETE FROM schedules WHERE id = ?"
+	query := "DELETE FROM schedules WHERE schedule_id = ?"
 
 	_, err := s.db.Exec(query, scheduleID)
 	return err

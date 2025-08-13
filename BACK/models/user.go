@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-// User API 응답용 사용자 구조체
+// User 사용자 정보 구조체 (DB용)
 type User struct {
 	ID         int        `json:"id"`
 	Userid     string     `json:"userid"`
@@ -16,6 +16,34 @@ type User struct {
 	HireDate   time.Time  `json:"hire_date"`
 	CreatedAt  *time.Time `json:"created_at,omitempty"`
 	UpdatedAt  *time.Time `json:"updated_at,omitempty"`
+}
+
+// RegisterRequest 회원가입 요청 구조체 (JSON용)
+type RegisterRequest struct {
+	Userid     string `json:"userid"`
+	Password   string `json:"password"`
+	Name       string `json:"name"`
+	Role       string `json:"role"`
+	Department string `json:"department"`
+	HireDate   string `json:"hire_date"` // 문자열로 받기
+}
+
+// ToUser RegisterRequest를 User로 변환
+func (req *RegisterRequest) ToUser() (*User, error) {
+	// 날짜 파싱
+	hireDate, err := time.Parse("2006-01-02", req.HireDate)
+	if err != nil {
+		return nil, err
+	}
+
+	return &User{
+		Userid:     req.Userid,
+		Password:   req.Password,
+		Name:       req.Name,
+		Role:       req.Role,
+		Department: req.Department,
+		HireDate:   hireDate,
+	}, nil
 }
 
 // LoginRequest 로그인 요청 모델 (auth.go에서 제거하고 여기로 이동)

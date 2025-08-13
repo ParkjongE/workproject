@@ -1,4 +1,5 @@
 import styled from '@vue-styled-components/core';
+import { defineComponent, h } from 'vue';
 
 export const RegisterContainer = styled.div`
   width: 869px;
@@ -41,7 +42,7 @@ export const InputLabel = styled.label`
   letter-spacing: 0.1em;
 `;
 
-export const RegisterInput = styled.input`
+const StyledInput = styled.input`
   width: 100%;
   height: 48px;
   border: 1px solid #757678;
@@ -52,6 +53,34 @@ export const RegisterInput = styled.input`
   box-sizing: border-box;
   font-family: 'Comfortaa', sans-serif;
 `;
+
+export const RegisterInput = defineComponent({
+  props: {
+    modelValue: String,
+    type: { type: String, default: 'text' },
+    placeholder: String,
+    id: String,
+    autocomplete: String,
+    required: Boolean
+  },
+  emits: ['update:modelValue'],
+  setup(props, { emit, attrs }) {
+    const handleInput = (event) => {
+      emit('update:modelValue', event.target.value);
+    };
+
+    return () => h(StyledInput, {
+      ...attrs,
+      type: props.type,
+      placeholder: props.placeholder,
+      id: props.id,
+      autocomplete: props.autocomplete,
+      required: props.required,
+      value: props.modelValue,
+      onInput: handleInput
+    });
+  }
+});
 
 export const RegisterSelect = styled.select`
   width: 100%;

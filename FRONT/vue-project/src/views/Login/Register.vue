@@ -82,6 +82,11 @@ export default {
 
   methods: {
     async handleRegister() {
+      console.log('아이디:', this.userid)
+      console.log('비밀번호:', this.password)
+      console.log('이름:', this.name)
+      console.log('부서:', this.department)
+      console.log('입사날짜:', this.hireDate)
       if (!this.userid || !this.password || !this.name || !this.hireDate) {
         this.errorMessage = '아이디, 비밀번호, 이름, 입사날짜는 필수 입력 항목입니다.';
         return;

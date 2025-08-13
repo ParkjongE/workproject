@@ -310,13 +310,13 @@ export default {
         const userResult = userResponse.data;
         console.log('[loadLeaveInfo] 사용자 정보:', userResult);
         
-        if (!userResult.success || !userResult.data) {
+        if (!userResult.success || !userResult.user) {
           console.error('사용자 정보 없음');
           this.leaveError = '사용자 정보를 가져올 수 없습니다';
           return;
         }
         
-        const userId = userResult.data.id;
+        const userId = userResult.user.id;
         
         console.log('[loadLeaveInfo] 연차 정보 요청:', `user_id=${userId}`);
         

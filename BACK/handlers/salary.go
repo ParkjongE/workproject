@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"BACK/models"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -12,8 +13,8 @@ import (
 
 // SalaryService 급여 관련 서비스 인터페이스
 type SalaryService interface {
-	GetSalaryStatement(userID int, year int, month int) (*SalaryFile, error)
-	GetSalaryStatementList(userID int) ([]SalaryStatement, error)
+	GetSalaryStatement(userID int, year int, month int) (*models.SalaryFile, error)
+	GetSalaryStatementList(userID int) ([]models.SalaryStatement, error)
 }
 
 // SalaryServiceImpl 급여 서비스 구현체
@@ -34,24 +35,6 @@ type SalaryHandler struct {
 // NewSalaryHandler 급여 핸들러 생성자
 func NewSalaryHandler(service SalaryService) *SalaryHandler {
 	return &SalaryHandler{service: service}
-}
-
-// SalaryFile 급여 파일 정보 구조체
-type SalaryFile struct {
-	FileName    string
-	FilePath    string
-	FileSize    int64
-	ContentType string
-}
-
-// SalaryStatement 급여 명세서 정보 구조체
-type SalaryStatement struct {
-	ID       int    `json:"id"`
-	UserID   int    `json:"user_id"`
-	Year     int    `json:"year"`
-	Month    int    `json:"month"`
-	FileName string `json:"file_name"`
-	FilePath string `json:"file_path"`
 }
 
 // GetSalaryStatement 급여 명세서 조회
@@ -90,7 +73,9 @@ func (h *SalaryHandler) GetSalaryStatement(w http.ResponseWriter, r *http.Reques
 
 // GetSalaryStatementList 급여 명세서 목록 조회
 func (h *SalaryHandler) GetSalaryStatementList(w http.ResponseWriter, r *http.Request) {
+	fmt.Printf("[핸들러] GetSalaryStatementList 호출됨! URL: %s\n", r.URL.String())
 	userIDStr := r.URL.Query().Get("user_id")
+	fmt.Printf("[핸들러] userIDStr: %s\n", userIDStr)
 	userID, err := strconv.Atoi(userIDStr)
 	if err != nil {
 		http.Error(w, "Invalid user ID", http.StatusBadRequest)
@@ -113,7 +98,7 @@ func (h *SalaryHandler) GetSalaryStatementList(w http.ResponseWriter, r *http.Re
 }
 
 // GetSalaryStatement 서비스 구현
-func (s *SalaryServiceImpl) GetSalaryStatement(userID int, year int, month int) (*SalaryFile, error) {
+func (s *SalaryServiceImpl) GetSalaryStatement(userID int, year int, month int) (*models.SalaryFile, error) {
 	fileName := fmt.Sprintf("salary_statement_%d_%d_%d.pdf", userID, year, month)
 	filePath := filepath.Join(s.basePath, fileName)
 
@@ -122,7 +107,7 @@ func (s *SalaryServiceImpl) GetSalaryStatement(userID int, year int, month int) 
 		return nil, err
 	}
 
-	return &SalaryFile{
+	return &models.SalaryFile{
 		FileName:    fileName,
 		FilePath:    filePath,
 		FileSize:    fileInfo.Size(),
@@ -131,13 +116,18 @@ func (s *SalaryServiceImpl) GetSalaryStatement(userID int, year int, month int) 
 }
 
 // GetSalaryStatementList 서비스 구현
-func (s *SalaryServiceImpl) GetSalaryStatementList(userID int) ([]SalaryStatement, error) {
-	var statements []SalaryStatement
+func (s *SalaryServiceImpl) GetSalaryStatementList(userID int) ([]models.SalaryStatement, error) {
+	var statements []models.SalaryStatement
+
+	fmt.Printf("[GetSalaryStatementList] 파일 검색 시작: userID=%d, basePath=%s\n", userID, s.basePath)
 
 	files, err := os.ReadDir(s.basePath)
 	if err != nil {
+		fmt.Printf("[GetSalaryStatementList] 디렉토리 읽기 오류: %v\n", err)
 		return nil, err
 	}
+
+	fmt.Printf("[GetSalaryStatementList] 총 파일 개수: %d\n", len(files))
 
 	for _, file := range files {
 		if file.IsDir() {
@@ -145,22 +135,30 @@ func (s *SalaryServiceImpl) GetSalaryStatementList(userID int) ([]SalaryStatemen
 		}
 
 		fileName := file.Name()
-		if strings.HasPrefix(fileName, fmt.Sprintf("salary_statement_%d_", userID)) {
-			parts := strings.Split(strings.TrimSuffix(fileName, ".pdf"), "_")
-			if len(parts) == 4 {
-				year, _ := strconv.Atoi(parts[2])
-				month, _ := strconv.Atoi(parts[3])
+		fmt.Printf("[GetSalaryStatementList] 파일 확인: %s\n", fileName)
 
-				statements = append(statements, SalaryStatement{
+		if strings.HasPrefix(fileName, fmt.Sprintf("salary_statement_%d_", userID)) {
+			fmt.Printf("[GetSalaryStatementList] 매칭된 파일: %s\n", fileName)
+			parts := strings.Split(strings.TrimSuffix(fileName, ".pdf"), "_")
+			fmt.Printf("[GetSalaryStatementList] 파일명 분리: %v\n", parts)
+
+			if len(parts) == 5 {
+				year, _ := strconv.Atoi(parts[3])
+				month, _ := strconv.Atoi(parts[4])
+
+				statement := models.SalaryStatement{
 					UserID:   userID,
 					Year:     year,
 					Month:    month,
 					FileName: fileName,
 					FilePath: filepath.Join(s.basePath, fileName),
-				})
+				}
+				fmt.Printf("[GetSalaryStatementList] 추가된 statement: %+v\n", statement)
+				statements = append(statements, statement)
 			}
 		}
 	}
 
+	fmt.Printf("[GetSalaryStatementList] 최종 결과: %d개 파일\n", len(statements))
 	return statements, nil
 }

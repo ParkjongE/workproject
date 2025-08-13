@@ -1,7 +1,7 @@
 <template>
   <MyScheduleRoot>
-    <SideBar />
-    <ContentArea>
+    <SideBar v-if="!hideSideBar" />
+    <ContentArea :class="{ 'full-width': hideSideBar }">
       <HeaderContainer>
         <Title>나의 일정 수정</Title>
         <EditPrivacyBtn v-if="!editingPrivacy" @click="startEditingPrivacy">
@@ -89,6 +89,12 @@ import { useAttendanceStore } from '@/stores/attendance';
 
 export default {
   name: 'MySchedule',
+  props: {
+    hideSideBar: {
+      type: Boolean,
+      default: false
+    }
+  },
   components: {
     SideBar,
     ClockSection,

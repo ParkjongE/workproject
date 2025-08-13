@@ -76,9 +76,14 @@ func (s *RegisterServiceImpl) HashUserPassword(password string) (string, string,
 
 // RegisterUser 사용자 등록
 func (s *RegisterServiceImpl) RegisterUser(user *models.User) error {
+	// hire_date가 비어있으면 기본값 설정 (2024-01-01)
+	if user.HireDate.IsZero() {
+		user.HireDate = time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	}
+
 	// 사용자 등록 - 데이터베이스에 저장
 	result, err := s.db.Exec("INSERT INTO users (userid, password, salt, name, role, department, hire_date) VALUES (?, ?, ?, ?, ?, ?, ?)",
-		user.Userid, user.Password, user.Name, user.Role, user.Department, user.HireDate)
+		user.Userid, user.Password, user.Salt, user.Name, user.Role, user.Department, user.HireDate)
 
 	if err != nil {
 		return &RegisterError{Message: "사용자 등록에 실패했습니다", Code: "DB_ERROR"}
@@ -135,6 +140,7 @@ func (h *RegisterHandler) ParseUserData(r *http.Request) (*models.User, error) {
 		user.Role = r.FormValue("role")
 		user.Department = r.FormValue("department")
 
+		// Form 데이터 처리 (기존 호환성)
 		if hireDateStr := r.FormValue("hire_date"); hireDateStr != "" {
 			if hireDate, err := time.Parse("2006-01-02", hireDateStr); err == nil {
 				user.HireDate = hireDate
@@ -154,19 +160,21 @@ func (h *RegisterHandler) ParseUserData(r *http.Request) (*models.User, error) {
 			return nil, &RegisterError{Message: "요청 본문이 비어 있습니다", Code: "EMPTY_BODY"}
 		}
 
-		// JSON 파싱 시도
-		if err := json.Unmarshal(body, &user); err != nil {
+		// RegisterRequest로 파싱
+		var reqData models.RegisterRequest
+		if err := json.Unmarshal(body, &reqData); err != nil {
 			log.Printf("JSON 파싱 오류: %v", err)
-
-			// 대체 파싱 방법 시도
-			var rawData map[string]interface{}
-			if err := json.Unmarshal(body, &rawData); err != nil {
-				return nil, &RegisterError{Message: fmt.Sprintf("잘못된 JSON 형식: %v", err), Code: "INVALID_JSON"}
-			}
-
-			// 수동으로 필드 추출
-			h.extractUserFieldsFromRawData(&user, rawData)
+			return nil, &RegisterError{Message: fmt.Sprintf("잘못된 JSON 형식: %v", err), Code: "INVALID_JSON"}
 		}
+
+		// RegisterRequest를 User로 변환
+		convertedUser, err := reqData.ToUser()
+		if err != nil {
+			log.Printf("날짜 파싱 오류: %v", err)
+			return nil, &RegisterError{Message: fmt.Sprintf("입사날짜 형식이 올바르지 않습니다: %v", err), Code: "INVALID_DATE"}
+		}
+
+		user = *convertedUser
 	} else {
 		return nil, &RegisterError{Message: "지원하지 않는 Content-Type입니다. application/json 또는 multipart/form-data를 사용하세요.", Code: "UNSUPPORTED_CONTENT_TYPE"}
 	}

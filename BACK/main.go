@@ -62,16 +62,22 @@ func main() {
 	http.HandleFunc("/api/salary/list", salaryHandler.GetSalaryStatementList)
 
 	// 스케줄 관련
-	http.HandleFunc("/api/schedule", scheduleHandler.CreateSchedule)
-	http.HandleFunc("/api/schedule/user", scheduleHandler.GetSchedulesByUser)
-	http.HandleFunc("/api/schedule/update", scheduleHandler.UpdateSchedule)
-	http.HandleFunc("/api/schedule/delete", scheduleHandler.DeleteSchedule)
+	http.HandleFunc("/api/schedule", scheduleHandler.CreateSchedule)        // POST: 일정 생성
+	http.HandleFunc("/api/schedules", scheduleHandler.GetSchedulesByUser)   // GET: 일정 조회
+	http.HandleFunc("/api/schedule/update", scheduleHandler.UpdateSchedule) // PUT: 일정 수정
+	http.HandleFunc("/api/schedule/delete", scheduleHandler.DeleteSchedule) // DELETE: 일정 삭제
 
 	// 사용자 프로필 조회 라우트 추가
 	http.HandleFunc("/api/user/profile", authService.GetUserProfile)
 
+	// 요청 로깅 미들웨어 추가
+	loggingHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("🚀 요청: %s %s", r.Method, r.URL.String())
+		http.DefaultServeMux.ServeHTTP(w, r)
+	})
+
 	// CORS 미들웨어 적용
-	handler := middleware.CORS(http.DefaultServeMux)
+	handler := middleware.CORS(loggingHandler)
 
 	log.Println("서버가 포트 8081에서 시작되었습니다.")
 	log.Fatal(http.ListenAndServe(":8081", handler))

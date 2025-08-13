@@ -106,7 +106,6 @@ export default {
     // props로 받은 mySchedules를 사용하여 getDaySchedules 함수 생성
     const getDaySchedules = (date) => {
       if (!date) return [];
-      console.log('[CalendarSection] getDaySchedules 호출, date:', date, 'mySchedules:', props.mySchedules.length);
       // props.mySchedules에 직접 접근하여 반응성 보장
       const schedules = props.mySchedules || [];
       return schedules.filter(schedule => {

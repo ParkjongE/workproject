@@ -15,6 +15,12 @@ export const ContentArea = styled.div`
   overflow-y: auto;
   background-color: #f5f5f5;
   min-height: 100vh;
+  
+  &.full-width {
+    margin-left: 0;
+    width: 100%;
+    max-width: none;
+  }
 `;
 
 export const HeaderContainer = styled.div`
