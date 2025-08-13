@@ -16,7 +16,7 @@
       <RegisterInput type="text" id="name" v-model="name" placeholder="이름을 입력하세요" />
 
       <InputLabel for="department">부서</InputLabel>
-      <RegisterSelect id="department" v-model="department">
+      <RegisterSelect id="department" v-model="department" @change="onDepartmentChange">
         <option value="">부서 선택</option>
         <option v-for="dept in departments" :key="dept" :value="dept">{{ dept }}</option>
       </RegisterSelect>
@@ -74,13 +74,18 @@ export default {
       name: '',
       department: '',
       hireDate: '',
-      departments: ['개발팀', '디자인팀', '마케팅팀'],
+      departments: ['개발부', '디자인부', '마케팅부'],
       errorMessage: '',
       isLoading: false
     }
   },
 
   methods: {
+    onDepartmentChange(event) {
+      console.log('부서 변경됨:', event.target.value);
+      this.department = event.target.value;
+      console.log('현재 department 값:', this.department);
+    },
     async handleRegister() {
       console.log('아이디:', this.userid)
       console.log('비밀번호:', this.password)
