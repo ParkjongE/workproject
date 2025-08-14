@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: process.env.VUE_APP_API_URL || 'http://localhost:8081',
+  baseURL: process.env.VUE_APP_API_URL || 'http://192.168.0.23:8081',
   timeout: 10000,
   withCredentials: true
 });

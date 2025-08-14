@@ -1,4 +1,4 @@
-package models
+package model
 
 import (
 	"time"
@@ -72,4 +72,25 @@ type RefreshTokenResponse struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
 	Message      string `json:"message"`
+}
+
+// ==================== 공통 Response 구조체들 ====================
+
+// APIResponse 공통 API 응답 구조체
+type APIResponse struct {
+	Success bool        `json:"success"`
+	Message string      `json:"message"`
+	Data    interface{} `json:"data,omitempty"`
+}
+
+// SuccessResponse 성공 응답 구조체
+type SuccessResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+}
+
+// ErrorResponse 에러 응답 구조체
+type ErrorResponse struct {
+	Success bool   `json:"success"`
+	Error   string `json:"error"`
 }

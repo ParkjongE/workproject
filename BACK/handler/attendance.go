@@ -1,7 +1,7 @@
-package handlers
+package handler
 
 import (
-	"BACK/models"
+	"BACK/model"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -12,8 +12,8 @@ import (
 
 // AttendanceService 출근 관련 서비스 인터페이스
 type AttendanceService interface {
-	GetAttendance(userID int, startDate, endDate time.Time) ([]models.Attendance, error)
-	PostAttendance(userID int, date time.Time, action string, timeStr string) error
+	GetAttendance(userID int, startDate, endDate time.Time) ([]model.Attendance, error)
+	PostAttendance(userID int, date time.Time, action string, timeStr string, clientIP string) error
 }
 
 // AttendanceHandler 출근 핸들러
@@ -56,7 +56,7 @@ func (h *AttendanceHandler) GetAttendanceHistory(w http.ResponseWriter, r *http.
 	log.Printf("조회된 기록 수: %d", len(history))
 
 	// 🔄 구조체 배열로 변환 (snake_case 형식)
-	var records []models.AttendanceListResponse
+	var records []model.AttendanceListResponse
 	for _, attendance := range history {
 		records = append(records, attendance.ToHistoryResponse())
 	}
@@ -92,7 +92,7 @@ func (h *AttendanceHandler) GetAttendanceByDate(w http.ResponseWriter, r *http.R
 	if err != nil {
 		log.Printf("GetAttendance 호출 실패: %v", err)
 		// 해당 날짜에 기록이 없는 경우 빈 응답 (구조체 사용)
-		emptyResponse := models.AttendanceListResponse{
+		emptyResponse := model.AttendanceListResponse{
 			WorkDate:      dateStr,
 			CheckInTime2:  nil,
 			CheckOutTime2: nil,
@@ -103,13 +103,13 @@ func (h *AttendanceHandler) GetAttendanceByDate(w http.ResponseWriter, r *http.R
 	}
 
 	// 결과가 있으면 첫 번째 항목 사용, 없으면 빈 응답
-	var response models.AttendanceListResponse
+	var response model.AttendanceListResponse
 	if len(history) > 0 {
 		// 🎯 기존 ToHistoryResponse 메서드 활용 (snake_case 형식)
 		response = history[0].ToHistoryResponse()
 	} else {
 		// 기록이 없는 경우 빈 응답
-		response = models.AttendanceListResponse{
+		response = model.AttendanceListResponse{
 			WorkDate:      dateStr,
 			CheckInTime2:  nil,
 			CheckOutTime2: nil,
@@ -159,7 +159,7 @@ func (h *AttendanceHandler) GetAttendanceRecords(w http.ResponseWriter, r *http.
 	log.Printf("조회된 기록 수: %d", len(history))
 
 	// 🔄 구조체 배열로 변환 (camelCase 형식)
-	var records []models.AttendanceListResponse
+	var records []model.AttendanceListResponse
 	for _, attendance := range history {
 		records = append(records, attendance.ToRecordsResponse())
 	}
@@ -175,8 +175,12 @@ func (h *AttendanceHandler) CheckIn(w http.ResponseWriter, r *http.Request) {
 	log.Println("=== CheckIn 시작 ===")
 	log.Printf("요청 메서드: %s, URL: %s", r.Method, r.URL.Path)
 
+	// 클라이언트 IP 추출
+	clientIP := h.getClientIP(r)
+	log.Printf("클라이언트 IP: %s", clientIP)
+
 	// 🔄 models.CheckInRequest 사용
-	var req models.CheckInRequest
+	var req model.CheckInRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		log.Printf("요청 바디 파싱 실패: %v", err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
@@ -199,8 +203,8 @@ func (h *AttendanceHandler) CheckIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// PostAttendance 사용
-	err = h.service.PostAttendance(req.UserID, date, "checkin", req.CheckInTime)
+	// PostAttendance 사용 (IP 전달)
+	err = h.service.PostAttendance(req.UserID, date, "checkin", req.CheckInTime, clientIP)
 	if err != nil {
 		log.Printf("PostAttendance 호출 실패: %v", err)
 		http.Error(w, "Failed to record check-in", http.StatusInternalServerError)
@@ -208,7 +212,7 @@ func (h *AttendanceHandler) CheckIn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 🔄 models.CheckInResponse 사용
-	response := models.CheckInResponse{
+	response := model.CheckInResponse{
 		Success:     true,
 		CheckInTime: req.CheckInTime,
 		Message:     "출근이 기록되었습니다.",
@@ -223,7 +227,7 @@ func (h *AttendanceHandler) CheckOut(w http.ResponseWriter, r *http.Request) {
 	log.Println("=== CheckOut 시작 ===")
 
 	// 🔄 models.CheckOutRequest 사용
-	var req models.CheckOutRequest
+	var req model.CheckOutRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
@@ -235,8 +239,11 @@ func (h *AttendanceHandler) CheckOut(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 클라이언트 IP 추출
+	clientIP := h.getClientIP(r)
+
 	// PostAttendance 사용
-	err = h.service.PostAttendance(req.UserID, date, "checkout", req.CheckOutTime)
+	err = h.service.PostAttendance(req.UserID, date, "checkout", req.CheckOutTime, clientIP)
 	if err != nil {
 		log.Printf("PostAttendance 호출 실패: %v", err)
 		http.Error(w, "Failed to record check-out", http.StatusInternalServerError)
@@ -244,7 +251,7 @@ func (h *AttendanceHandler) CheckOut(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 🔄 models.CheckOutResponse 사용
-	response := models.CheckOutResponse{
+	response := model.CheckOutResponse{
 		Success:      true,
 		CheckOutTime: req.CheckOutTime,
 		Message:      "퇴근이 기록되었습니다.",
@@ -259,7 +266,7 @@ func (h *AttendanceHandler) RecordAttendance(w http.ResponseWriter, r *http.Requ
 	log.Println("=== RecordAttendance 시작 ===")
 
 	// 🔄 임시 구조체 대신 models.AttendanceRequest 사용
-	var req models.AttendanceRequest
+	var req model.AttendanceRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
@@ -282,7 +289,10 @@ func (h *AttendanceHandler) RecordAttendance(w http.ResponseWriter, r *http.Requ
 		action = "record"
 	}
 
-	err = h.service.PostAttendance(req.UserID, date, action, "")
+	// 클라이언트 IP 추출
+	clientIP := h.getClientIP(r)
+
+	err = h.service.PostAttendance(req.UserID, date, action, "", clientIP)
 	if err != nil {
 		log.Printf("PostAttendance 호출 실패: %v", err)
 		http.Error(w, "Failed to record attendance", http.StatusInternalServerError)
@@ -290,7 +300,7 @@ func (h *AttendanceHandler) RecordAttendance(w http.ResponseWriter, r *http.Requ
 	}
 
 	// 🔄 models.AttendanceResponse 사용
-	response := models.AttendanceResponse{
+	response := model.AttendanceResponse{
 		Success: true,
 		Message: "Attendance recorded successfully",
 	}
@@ -309,4 +319,30 @@ func (h *AttendanceHandler) sendJSONResponse(w http.ResponseWriter, data interfa
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
+}
+
+// getClientIP 클라이언트의 실제 IP 주소를 가져옵니다
+func (h *AttendanceHandler) getClientIP(r *http.Request) string {
+	// X-Forwarded-For 헤더 확인 (프록시 환경)
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		return strings.TrimSpace(strings.Split(xff, ",")[0])
+	}
+
+	// X-Real-IP 헤더 확인
+	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+		return strings.TrimSpace(xri)
+	}
+
+	// 직접 연결의 경우 (포트 번호 제거)
+	ip := r.RemoteAddr
+	if idx := strings.LastIndex(ip, ":"); idx != -1 {
+		ip = ip[:idx]
+	}
+
+	// IPv6 대괄호 제거
+	if strings.HasPrefix(ip, "[") && strings.HasSuffix(ip, "]") {
+		ip = ip[1 : len(ip)-1]
+	}
+
+	return ip
 }

@@ -1166,26 +1166,50 @@ export default {
     },
     
     getMiniCalendarDayNumber(index) {
-      // 본인 노드용 미니 달력은 현재 실제 월 기준
-      const now = new Date();
-      const currentYear = now.getFullYear();
-      const currentMonth = now.getMonth();
+      // 나의일정수정에서 선택된 날짜를 기준으로 하거나, 없으면 현재 월 기준
+      const selectedDate = this.getSelectedDateFromSchedule();
+      const currentYear = selectedDate.getFullYear();
+      const currentMonth = selectedDate.getMonth();
+      
+      // index는 1부터 시작하므로 0부터 시작하도록 조정
+      const zeroBasedIndex = index - 1;
       
       const currentDate = new Date(currentYear, currentMonth, 1);
       const firstDayOfMonth = currentDate.getDay();
-      const adjustedIndex = index - firstDayOfMonth;
+      const adjustedIndex = zeroBasedIndex - firstDayOfMonth;
       
       if (adjustedIndex < 0) {
         // 이전 달의 날짜
         const prevMonthLastDate = new Date(currentYear, currentMonth, 0).getDate();
         return prevMonthLastDate + adjustedIndex + 1;
-      } else if (adjustedIndex >= new Date(currentYear, currentMonth + 1, 0).getDate()) {
-        // 다음 달의 날짜
-        return adjustedIndex - new Date(currentYear, currentMonth + 1, 0).getDate() + 1;
       } else {
-        // 현재 달의 날짜
-        return adjustedIndex + 1;
+        // 현재 달의 날짜 (다음 달로 넘어가는 경우도 현재 달 기준으로 계산)
+        const currentMonthLastDate = new Date(currentYear, currentMonth + 1, 0).getDate();
+        if (adjustedIndex + 1 <= currentMonthLastDate) {
+          return adjustedIndex + 1;
+        } else {
+          // 다음 달의 날짜
+          return adjustedIndex + 1 - currentMonthLastDate;
+        }
       }
+    },
+    
+    // 나의일정수정에서 선택된 날짜 가져오기 (localStorage 활용)
+    getSelectedDateFromSchedule() {
+      try {
+        const savedDate = localStorage.getItem('myScheduleSelectedDate');
+        if (savedDate) {
+          const date = new Date(savedDate);
+          // 유효한 날짜인지 확인
+          if (!isNaN(date.getTime())) {
+            return date;
+          }
+        }
+      } catch (error) {
+        console.warn('로컬스토리지에서 선택된 날짜를 가져오는 중 오류:', error);
+      }
+      // 저장된 날짜가 없거나 유효하지 않으면 현재 날짜 반환
+      return new Date();
     },
     
     // 프로젝트가 해당 날짜에 진행 중인지 확인
@@ -1218,14 +1242,17 @@ export default {
     
     // 미니 달력의 날짜 인덱스로부터 실제 날짜 계산
     getMiniCalendarDate(index) {
-      // 본인 노드용 미니 달력은 현재 실제 월 기준
-      const now = new Date();
-      const currentYear = now.getFullYear();
-      const currentMonth = now.getMonth();
+      // 나의일정수정에서 선택된 날짜를 기준으로 하거나, 없으면 현재 월 기준
+      const selectedDate = this.getSelectedDateFromSchedule();
+      const currentYear = selectedDate.getFullYear();
+      const currentMonth = selectedDate.getMonth();
+      
+      // index는 1부터 시작하므로 0부터 시작하도록 조정
+      const zeroBasedIndex = index - 1;
       
       const currentDate = new Date(currentYear, currentMonth, 1);
       const firstDayOfMonth = currentDate.getDay();
-      const adjustedIndex = index - firstDayOfMonth;
+      const adjustedIndex = zeroBasedIndex - firstDayOfMonth;
       
       if (adjustedIndex < 0) {
         // 이전 달의 날짜
@@ -1234,16 +1261,19 @@ export default {
         const prevMonthLastDate = new Date(currentYear, currentMonth, 0).getDate();
         const day = prevMonthLastDate + adjustedIndex + 1;
         return `${prevMonthYear}-${String(prevMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      } else if (adjustedIndex >= new Date(currentYear, currentMonth + 1, 0).getDate()) {
-        // 다음 달의 날짜
-        const nextMonthYear = currentMonth === 11 ? currentYear + 1 : currentYear;
-        const nextMonth = currentMonth === 11 ? 0 : currentMonth + 1;
-        const day = adjustedIndex - new Date(currentYear, currentMonth + 1, 0).getDate() + 1;
-        return `${nextMonthYear}-${String(nextMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       } else {
-        // 현재 달의 날짜
-        const day = adjustedIndex + 1;
-        return `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        // 현재 달의 날짜 (다음 달로 넘어가는 경우도 처리)
+        const currentMonthLastDate = new Date(currentYear, currentMonth + 1, 0).getDate();
+        if (adjustedIndex + 1 <= currentMonthLastDate) {
+          const day = adjustedIndex + 1;
+          return `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        } else {
+          // 다음 달의 날짜
+          const nextMonthYear = currentMonth === 11 ? currentYear + 1 : currentYear;
+          const nextMonth = currentMonth === 11 ? 0 : currentMonth + 1;
+          const day = adjustedIndex + 1 - currentMonthLastDate;
+          return `${nextMonthYear}-${String(nextMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        }
       }
     },
 
@@ -1272,6 +1302,15 @@ export default {
     getCurrentSelectedDate() {
       if (!this.expandedMember) return this.today;
       return this.memberSelectedDates[this.expandedMember.id] || this.today;
+    },
+    
+    // 페이지 포커스 리스너 설정
+    setupPageFocusListener() {
+      this.pageFocusListener = () => {
+        // 페이지에 포커스가 돌아왔을 때 미니달력 강제 업데이트
+        this.$forceUpdate();
+      };
+      window.addEventListener('focus', this.pageFocusListener);
     }
   },
   async mounted() {
@@ -1302,6 +1341,17 @@ export default {
         console.warn('GraphView 요소를 찾을 수 없습니다.');
       }
     });
+    
+    // localStorage 변경 감지를 위한 이벤트 리스너 (같은 탭에서는 동작하지 않으므로 다른 방법 사용)
+    // 대신 페이지 포커스 시 미니달력을 다시 렌더링하도록 설정
+    this.setupPageFocusListener();
+  },
+  
+  beforeUnmount() {
+    // 이벤트 리스너 정리
+    if (this.pageFocusListener) {
+      window.removeEventListener('focus', this.pageFocusListener);
+    }
   }
 };
 </script>

@@ -2,8 +2,9 @@ package main
 
 import (
 	"BACK/config"
-	"BACK/handlers"
+	"BACK/handler"
 	"BACK/middleware"
+	"BACK/repository"
 	"BACK/service"
 	"log"
 	"net/http"
@@ -15,23 +16,29 @@ func main() {
 		log.Fatal("데이터베이스 초기화 실패:", err)
 	}
 
+	// Repository 생성
+	attendanceRepo := repository.NewAttendanceRepository(config.DB)
+	scheduleRepo := repository.NewScheduleRepository(config.DB)
+	registerRepo := repository.NewRegisterRepository(config.DB)
+	leaveRepo := repository.NewLeaveRepository(config.DB)
+
 	// 서비스 생성
-	authService := handlers.NewAuthService(config.DB)
-	registerService := handlers.NewRegisterService(config.DB)
-	jwtService := handlers.NewJWTService(config.GetDB())
-	attendanceService := service.NewAttendanceService(config.DB)
-	leaveService := handlers.NewLeaveService(config.DB)
-	salaryService := handlers.NewSalaryService("./files/salary")
-	scheduleService := handlers.NewScheduleService(config.DB)
+	authService := handler.NewAuthService(config.DB)
+	registerService := service.NewRegisterService(registerRepo)
+	jwtService := handler.NewJWTService(config.GetDB())
+	attendanceService := service.NewAttendanceService(attendanceRepo)
+	leaveService := service.NewLeaveService(leaveRepo)
+	salaryService := service.NewSalaryService("./files/salary")
+	scheduleService := service.NewScheduleService(scheduleRepo)
 
 	// 핸들러 생성
-	authHandler := handlers.NewAuthHandler(authService)
-	registerHandler := handlers.NewRegisterHandler(registerService)
-	jwtHandler := handlers.NewJWTHandler(jwtService)
-	attendanceHandler := handlers.NewAttendanceHandler(attendanceService)
-	leaveHandler := handlers.NewLeaveHandler(leaveService)
-	salaryHandler := handlers.NewSalaryHandler(salaryService)
-	scheduleHandler := handlers.NewScheduleHandler(scheduleService)
+	authHandler := handler.NewAuthHandler(authService)
+	registerHandler := handler.NewRegisterHandler(registerService)
+	jwtHandler := handler.NewJWTHandler(jwtService)
+	attendanceHandler := handler.NewAttendanceHandler(attendanceService)
+	leaveHandler := handler.NewLeaveHandler(leaveService)
+	salaryHandler := handler.NewSalaryHandler(salaryService)
+	scheduleHandler := handler.NewScheduleHandler(scheduleService)
 
 	// 라우터 설정
 	http.HandleFunc("/api/register", registerHandler.HandleRegister)

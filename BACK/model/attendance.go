@@ -1,4 +1,4 @@
-package models
+package model
 
 import (
 	"database/sql"
@@ -15,8 +15,6 @@ type Attendance struct {
 	Status       sql.NullString `json:"status" db:"status"` // NULL 허용
 	CreatedAt    time.Time      `json:"created_at" db:"created_at"`
 }
-
-
 
 // AttendanceRequest 출근 요청 구조체 (기존)
 type AttendanceRequest struct {

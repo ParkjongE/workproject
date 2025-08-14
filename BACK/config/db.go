@@ -70,7 +70,7 @@ func InitDB() error {
 	// 환경 변수에서 데이터베이스 연결 정보 가져오기
 	dbHost := os.Getenv("DB_HOST")
 	if dbHost == "" {
-		dbHost = "localhost"
+		dbHost = "192.168.0.23" // 서버 컴퓨터 IP로 변경
 	}
 
 	dbPort := os.Getenv("DB_PORT")

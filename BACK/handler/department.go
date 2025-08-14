@@ -1,17 +1,16 @@
-package handlers
+package handler
 
 import (
+	"BACK/model"
 	"encoding/json"
 	"net/http"
 	"strings"
-
-	"BACK/models"
 )
 
 // GetDepartments는 모든 부서 이름 목록을 반환하는 핸들러 함수입니다
 func GetDepartments(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string][]string{"departments": models.Departments}) // map[키타입]값타입
+	json.NewEncoder(w).Encode(map[string][]string{"departments": model.Departments}) // map[키타입]값타입
 	// 키타입: string, 값타입: []string
 	// 키타입: departments, 값타입: models.Departments
 	// 키타입: departments, 값타입: models.Departments
@@ -20,7 +19,7 @@ func GetDepartments(w http.ResponseWriter, r *http.Request) {
 // GetAllDepartmentStatuses는 모든 부서의 업무현황을 반환하는 핸들러 함수입니다
 func GetAllDepartmentStatuses(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(models.DepartmentStatuses)
+	json.NewEncoder(w).Encode(model.DepartmentStatuses)
 }
 
 // GetDepartmentStatus는 특정 부서의 업무현황을 반환하는 핸들러 함수입니다
@@ -36,8 +35,8 @@ func GetDepartmentStatus(w http.ResponseWriter, r *http.Request) {
 
 	name := path[4] // /api/departments/status/{name}
 
-	var result []models.DepartmentStatus
-	for _, dept := range models.DepartmentStatuses {
+	var result []model.DepartmentStatus
+	for _, dept := range model.DepartmentStatuses {
 		if dept.DepartmentName == name {
 			result = append(result, dept)
 		}

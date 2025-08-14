@@ -1,4 +1,4 @@
-package models
+package model
 
 // DepartmentStatus는 부서별 업무현황을 나타내는 구조체
 type DepartmentStatus struct {

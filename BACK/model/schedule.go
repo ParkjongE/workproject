@@ -1,4 +1,4 @@
-package models
+package model
 
 type Schedule struct {
 	ID          int    `json:"id"`
@@ -13,4 +13,19 @@ type Schedule struct {
 	CreatedAt   string `json:"created_at"`
 	UpdatedAt   string `json:"updated_at"`
 	Color       string `json:"color"`
+}
+
+// ==================== Response 구조체들 ====================
+
+// ScheduleAPIResponse 스케줄 API 응답 구조체
+type ScheduleAPIResponse struct {
+	Success bool      `json:"success"`
+	Message string    `json:"message"`
+	Data    *Schedule `json:"data,omitempty"`
+}
+
+// ScheduleSuccessResponse 스케줄 성공 응답 구조체
+type ScheduleSuccessResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
 }

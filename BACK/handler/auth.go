@@ -1,10 +1,11 @@
-package handlers
+package handler
 
 import (
 	"BACK/config"
-	"BACK/models"
+	"BACK/model"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -14,9 +15,9 @@ import (
 // AuthService 인증 관련 서비스 인터페이스
 type AuthService interface {
 	HandleLogin(w http.ResponseWriter, r *http.Request)
-	ValidateUser(userid, password string) (*models.User, error)
+	ValidateUser(userid, password string) (*model.User, error)
 	RefreshToken(tokenString string) (string, error)
-	GetCurrentUser(tokenString string) (*models.User, error)
+	GetCurrentUser(tokenString string) (*model.User, error)
 	GetUserProfile(w http.ResponseWriter, r *http.Request) // 이 줄 추가
 }
 
@@ -46,8 +47,8 @@ func (h *AuthHandler) HandleLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 // ValidateUser 사용자 검증
-func (s *AuthServiceImpl) ValidateUser(userid, password string) (*models.User, error) {
-	var userDB models.UserDB
+func (s *AuthServiceImpl) ValidateUser(userid, password string) (*model.User, error) {
+	var userDB model.UserDB
 	query := "SELECT id, userid, password, salt, name, role, department, created_at, hire_date FROM users WHERE userid = ?"
 
 	err := s.db.QueryRow(query, userid).Scan(
@@ -85,13 +86,13 @@ func (s *AuthServiceImpl) RefreshToken(tokenString string) (string, error) {
 }
 
 // GetCurrentUser 현재 사용자 정보 조회
-func (s *AuthServiceImpl) GetCurrentUser(tokenString string) (*models.User, error) {
+func (s *AuthServiceImpl) GetCurrentUser(tokenString string) (*model.User, error) {
 	claims, err := utils.ValidateJWT(tokenString)
 	if err != nil {
 		return nil, err
 	}
 
-	var userDB models.UserDB
+	var userDB model.UserDB
 	query := "SELECT id, userid, password, salt, name, role, department, created_at, upda	ted_at FROM users WHERE id = ?"
 
 	err = s.db.QueryRow(query, claims.UserID).Scan(
@@ -116,14 +117,18 @@ func (s *AuthServiceImpl) HandleLogin(w http.ResponseWriter, r *http.Request) {
 
 	var err error // 함수 시작 부분에 err 변수 선언
 
-	var loginReq models.LoginRequest
+	var loginReq model.LoginRequest
 	if err = json.NewDecoder(r.Body).Decode(&loginReq); err != nil { // := 대신 = 사용
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		log.Printf("JSON 파싱 오류: %v", err)
+		log.Printf("요청 헤더: %v", r.Header)
+		http.Error(w, fmt.Sprintf("Invalid request body: %v", err), http.StatusBadRequest)
 		return
 	}
 
+	log.Printf("파싱된 로그인 요청: userid=%s, password=[숨김]", loginReq.Userid)
+
 	// 사용자 조회
-	var userDB models.UserDB
+	var userDB model.UserDB
 	query := `SELECT id, userid, password, salt, name, role, department, hire_date, created_at FROM users WHERE userid = ?`
 	err = s.db.QueryRow(query, loginReq.Userid).Scan( // := 대신 = 사용
 		&userDB.ID, &userDB.Userid, &userDB.Password, &userDB.Salt,
@@ -244,7 +249,7 @@ func HandleRefreshToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var refreshToken string
-	var requestBody models.RefreshTokenRequest
+	var requestBody model.RefreshTokenRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&requestBody); err == nil {
 		refreshToken = requestBody.RefreshToken
@@ -276,7 +281,7 @@ func HandleRefreshToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := models.RefreshTokenResponse{
+	response := model.RefreshTokenResponse{
 		Success:      true,
 		AccessToken:  newAccessToken,
 		RefreshToken: refreshToken, // 기존 Refresh Token 사용
@@ -302,7 +307,7 @@ func GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 데이터베이스에서 사용자 정보 조회
-	var userDB models.UserDB
+	var userDB model.UserDB
 	query := "SELECT id, userid, password, salt, name, role, department, created_at, updated_at FROM users WHERE id = ?"
 
 	err = config.DB.QueryRow(query, userID).Scan(
@@ -358,7 +363,7 @@ func (s *AuthServiceImpl) GetUserProfile(w http.ResponseWriter, r *http.Request)
 
 	// 사용자 정보 조회
 	log.Println("사용자 정보 조회 시작")
-	var userDB models.UserDB
+	var userDB model.UserDB
 	query := `SELECT id, userid, password, salt, name, role, department, hire_date, created_at FROM users WHERE id = ?`
 	err = s.db.QueryRow(query, userID).Scan(
 		&userDB.ID, &userDB.Userid, &userDB.Password, &userDB.Salt,

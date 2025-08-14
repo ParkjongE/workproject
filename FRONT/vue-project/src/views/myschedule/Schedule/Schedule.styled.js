@@ -71,6 +71,12 @@ export const ScheduleManagement = styled.div`
   height: calc(100vh - 120px);
   margin-top: 20px;
   align-items: flex-start;
+  
+  @media (max-width: 1400px) {
+    flex-direction: column;
+    height: auto;
+    gap: 15px;
+  }
 `;
 
 // === 시계 섹션 ===
@@ -481,7 +487,7 @@ export const ModalOverlay = styled.div`
 
 // === 정보 카드 섹션 ===
 export const InfoCardSectionStyled = styled.div`
-  flex: 0 0 320px;
+  flex: 0 0 380px;
   display: flex;
   flex-direction: column;
   gap: 15px;
@@ -896,15 +902,15 @@ export const SaveBtn = styled.button`
 
 // === 달력 ===
 export const CalendarSectionStyle = styled.div`
-  flex: 0 0 780px;
+  flex: 1;
   display: flex;
   flex-direction: column;
   background-color: white;
   border-radius: 26px;
   padding: 24px;
   box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-  min-width: 442px;
-  max-width: 780px;
+  min-width: 600px;
+  max-width: 1000px;
   width: 100%;
   height: auto;
   align-items: center;
@@ -920,14 +926,19 @@ export const CalendarHeader = styled.div`
 export const CalendarGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 5px;
+  gap: 6px;
   background-color: #f5f5f5;
-  padding: 10px;
+  padding: 16px;
   border-radius: 16px;
   width: 100%;
   max-width: 100%;
   height: auto;
   box-sizing: border-box;
+  
+  @media (max-width: 768px) {
+    gap: 4px;
+    padding: 12px;
+  }
 `;
 
 export const WeekdayHeader = styled.div`
@@ -941,19 +952,30 @@ export const WeekdayHeader = styled.div`
 
 export const CalendarDay = styled.div`
   border: 2px solid #e0e0e0;
-  min-height: 73px;
   aspect-ratio: 1;
+  min-height: 0;
   padding: 8px;
   background-color: ${props => props.otherMonth ? '#f9f9f9' : 'white'};
   color: ${props => props.otherMonth ? '#aaa' : '#333'};
   cursor: pointer;
   transition: all 0.2s ease;
-  font-size: 21px;
+  font-size: 16px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   justify-content: flex-start;
   box-sizing: border-box;
+  overflow: hidden;
+  
+  @media (max-width: 1200px) {
+    font-size: 14px;
+    padding: 6px;
+  }
+  
+  @media (max-width: 768px) {
+    font-size: 12px;
+    padding: 4px;
+  }
 
   &:hover {
     background-color: #f0f8ff;

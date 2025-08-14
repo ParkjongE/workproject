@@ -175,6 +175,13 @@ export default {
     this.initializeCalendar();
     this.attendanceStore.initializeAttendance();
     this.fetchMySchedules();
+    
+    // 초기 선택된 날짜를 localStorage에 저장
+    try {
+      localStorage.setItem('myScheduleSelectedDate', this.selectedDate);
+    } catch (error) {
+      console.warn('로컬스토리지에 초기 선택된 날짜 저장 중 오류:', error);
+    }
   },
   beforeUpdate() {
     // 컴포넌트 업데이트 전 실행
@@ -276,6 +283,12 @@ export default {
     // 날짜 선택 이벤트 핸들러
     onDaySelected(date) {
       this.selectedDate = date;
+      // 선택된 날짜를 localStorage에 저장하여 다른 페이지에서 참조할 수 있도록 함
+      try {
+        localStorage.setItem('myScheduleSelectedDate', date);
+      } catch (error) {
+        console.warn('로컬스토리지에 선택된 날짜 저장 중 오류:', error);
+      }
     },
     
     // 파일 업로드 관련

@@ -2,6 +2,11 @@ const { defineConfig } = require('@vue/cli-service')
 const path = require('path');
 
 module.exports = {
+  devServer: {
+    host: '0.0.0.0',  // 모든 네트워크 인터페이스에서 접속 허용
+    port: 3000,
+    allowedHosts: 'all'  // 모든 호스트에서 접속 허용
+  },
   configureWebpack: {
     resolve: {
       alias: {

@@ -1,4 +1,4 @@
-package models
+package model
 
 import (
 	"time"
@@ -41,4 +41,25 @@ type LeaveCalculation struct {
 type LeavePolicy struct {
 	UnderOneYear map[string]interface{} `json:"under_one_year"`
 	OverOneYear  map[string]interface{} `json:"over_one_year"`
+}
+
+// ==================== Response 구조체들 ====================
+
+// LeaveStatusResponse 연차 현황 응답 구조체
+type LeaveStatusResponse struct {
+	Success bool         `json:"success"`
+	Data    *LeaveStatus `json:"data"`
+}
+
+// LeaveCalculationResponse 연차 계산 응답 구조체
+type LeaveCalculationResponse struct {
+	Success bool                   `json:"success"`
+	Data    map[string]interface{} `json:"data"`
+}
+
+// LeaveUpdateResponse 연차 업데이트 응답 구조체
+type LeaveUpdateResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+	Count   int    `json:"count"`
 }

@@ -68,4 +68,3 @@ CREATE TABLE attendance_records (
     FOREIGN KEY (user_id) REFERENCES users(id),
     UNIQUE KEY unique_user_date (user_id, work_date)
 );
-

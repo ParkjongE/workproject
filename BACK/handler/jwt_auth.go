@@ -1,7 +1,7 @@
-package handlers
+package handler
 
 import (
-	"BACK/models"
+	"BACK/model"
 	"BACK/utils"
 	"database/sql"
 	"encoding/json"
@@ -9,10 +9,10 @@ import (
 	"net/http"
 )
 
-// JWTService JWT 인증 관련 서비스 인터페이스
+// JWTService JWT 관련 서비스 인터페이스
 type JWTService interface {
-	AuthenticateUser(userid, password string) (*models.User, error)
-	GenerateToken(user *models.User) (string, error)
+	AuthenticateUser(userid, password string) (*model.User, error)
+	GenerateToken(user *model.User) (string, error)
 	RefreshToken(tokenString string) (string, error)
 	ValidateToken(tokenString string) (*utils.JWTClaims, error)
 }
@@ -28,8 +28,8 @@ func NewJWTService(db *sql.DB) JWTService {
 }
 
 // AuthenticateUser 사용자 인증 처리
-func (s *JWTServiceImpl) AuthenticateUser(userid, password string) (*models.User, error) {
-	var user models.User
+func (s *JWTServiceImpl) AuthenticateUser(userid, password string) (*model.User, error) {
+	var user model.User
 	var storedPassword string
 	var salt string
 
@@ -53,7 +53,7 @@ func (s *JWTServiceImpl) AuthenticateUser(userid, password string) (*models.User
 }
 
 // GenerateToken JWT 토큰 생성
-func (s *JWTServiceImpl) GenerateToken(user *models.User) (string, error) {
+func (s *JWTServiceImpl) GenerateToken(user *model.User) (string, error) {
 	return utils.GenerateJWT(user.ID, user.Userid, user.Role)
 }
 
@@ -75,10 +75,10 @@ type JWTLoginRequest struct {
 
 // JWTLoginResponse는 JWT 로그인 응답 구조체입니다
 type JWTLoginResponse struct {
-	Success bool        `json:"success"`
-	Token   string      `json:"token"`
-	User    models.User `json:"user"`
-	Message string      `json:"message"`
+	Success bool       `json:"success"`
+	Token   string     `json:"token"`
+	User    model.User `json:"user"`
+	Message string     `json:"message"`
 }
 
 // AuthError 인증 관련 에러 구조체

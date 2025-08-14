@@ -1,7 +1,6 @@
-package handlers
+package handler
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,93 +9,15 @@ import (
 	"strings"
 	"time"
 
-	"BACK/config"
-	"BACK/models"
-	"BACK/utils"
+	"BACK/model"
 )
 
 // RegisterService 사용자 등록 관련 서비스 인터페이스
 type RegisterService interface {
-	RegisterUser(user *models.User) error
-	ValidateUserData(user *models.User) error
+	RegisterUser(user *model.User) error
+	ValidateUserData(user *model.User) error
 	CheckUserExists(userid string) error
 	HashUserPassword(password string) (string, string, error)
-}
-
-// RegisterServiceImpl 사용자 등록 서비스 구현체
-type RegisterServiceImpl struct {
-	db config.Database
-}
-
-// NewRegisterService 사용자 등록 서비스 생성자
-func NewRegisterService(db config.Database) RegisterService {
-	return &RegisterServiceImpl{db: db}
-}
-
-// ValidateUserData 사용자 데이터 검증
-func (s *RegisterServiceImpl) ValidateUserData(user *models.User) error {
-	if user.Userid == "" || user.Password == "" || user.Name == "" {
-		return &RegisterError{Message: "사용자명, 비밀번호, 이름은 필수 입력 항목입니다", Code: "MISSING_REQUIRED_FIELDS"}
-	}
-
-	// hire_date가 비어있으면 기본값 설정 (2024-01-01)
-	if user.HireDate.IsZero() {
-		user.HireDate = time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-	}
-
-	// role이 비어있으면 기본값 "사원"으로 설정
-	if user.Role == "" {
-		user.Role = "사원"
-	}
-
-	return nil
-}
-
-// CheckUserExists 사용자명 중복 확인
-func (s *RegisterServiceImpl) CheckUserExists(userid string) error {
-	var existingID int
-	if err := s.db.QueryRow("SELECT id FROM users WHERE userid = ?", userid).Scan(&existingID); err == nil {
-		return &RegisterError{Message: "이미 사용 중인 사용자명입니다", Code: "USER_ALREADY_EXISTS"}
-	} else if err != sql.ErrNoRows {
-		return &RegisterError{Message: "서버 오류", Code: "DB_ERROR"}
-	}
-	return nil
-}
-
-// HashUserPassword 사용자 비밀번호 해싱
-func (s *RegisterServiceImpl) HashUserPassword(password string) (string, string, error) {
-	// 1. 솔트 생성 (에러 반환하지 않음)
-	salt := utils.GenerateSalt() // err 제거
-
-	// 2. 비밀번호와 솔트를 결합하여 해싱
-	hashedPassword := utils.HashPassword(password, salt)
-
-	return hashedPassword, salt, nil
-}
-
-// RegisterUser 사용자 등록
-func (s *RegisterServiceImpl) RegisterUser(user *models.User) error {
-	// hire_date가 비어있으면 기본값 설정 (2024-01-01)
-	if user.HireDate.IsZero() {
-		user.HireDate = time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-	}
-
-	// 사용자 등록 - 데이터베이스에 저장
-	result, err := s.db.Exec("INSERT INTO users (userid, password, salt, name, role, department, hire_date) VALUES (?, ?, ?, ?, ?, ?, ?)",
-		user.Userid, user.Password, user.Salt, user.Name, user.Role, user.Department, user.HireDate)
-
-	if err != nil {
-		return &RegisterError{Message: "사용자 등록에 실패했습니다", Code: "DB_ERROR"}
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		log.Printf("RowsAffected 확인 오류: %v", err)
-	} else {
-		log.Printf("영향받은 행 수: %d", rowsAffected)
-	}
-
-	return nil
 }
 
 // RegisterError 사용자 등록 관련 에러 구조체
@@ -120,11 +41,11 @@ func NewRegisterHandler(service RegisterService) *RegisterHandler {
 }
 
 // ParseUserData 요청에서 사용자 데이터 파싱
-func (h *RegisterHandler) ParseUserData(r *http.Request) (*models.User, error) {
+func (h *RegisterHandler) ParseUserData(r *http.Request) (*model.User, error) {
 	contentType := r.Header.Get("Content-Type")
 	log.Printf("Content-Type: %s", contentType)
 
-	var user models.User
+	var user model.User
 
 	if strings.Contains(contentType, "multipart/form-data") {
 		// multipart/form-data 처리
@@ -161,7 +82,7 @@ func (h *RegisterHandler) ParseUserData(r *http.Request) (*models.User, error) {
 		}
 
 		// RegisterRequest로 파싱
-		var reqData models.RegisterRequest
+		var reqData model.RegisterRequest
 		if err := json.Unmarshal(body, &reqData); err != nil {
 			log.Printf("JSON 파싱 오류: %v", err)
 			return nil, &RegisterError{Message: fmt.Sprintf("잘못된 JSON 형식: %v", err), Code: "INVALID_JSON"}
@@ -186,7 +107,7 @@ func (h *RegisterHandler) ParseUserData(r *http.Request) (*models.User, error) {
 }
 
 // extractUserFieldsFromRawData rawData에서 사용자 필드 추출
-func (h *RegisterHandler) extractUserFieldsFromRawData(user *models.User, rawData map[string]interface{}) {
+func (h *RegisterHandler) extractUserFieldsFromRawData(user *model.User, rawData map[string]interface{}) {
 	if userid, ok := rawData["userid"]; ok {
 		if str, ok := userid.(string); ok {
 			user.Userid = str
@@ -264,37 +185,20 @@ func (h *RegisterHandler) HandleRegister(w http.ResponseWriter, r *http.Request)
 
 	// 사용자 데이터 검증
 	if err := h.service.ValidateUserData(user); err != nil {
-		if registerErr, ok := err.(*RegisterError); ok {
-			http.Error(w, registerErr.Message, http.StatusBadRequest)
-			return
-		}
-		http.Error(w, "서버 오류", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	// 사용자명 중복 확인
 	if err := h.service.CheckUserExists(user.Userid); err != nil {
-		if registerErr, ok := err.(*RegisterError); ok {
-			switch registerErr.Code {
-			case "USER_ALREADY_EXISTS":
-				http.Error(w, registerErr.Message, http.StatusConflict)
-			default:
-				http.Error(w, registerErr.Message, http.StatusInternalServerError)
-			}
-			return
-		}
-		http.Error(w, "서버 오류", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
 
 	// 비밀번호 해싱
 	hashedPassword, salt, err := h.service.HashUserPassword(user.Password)
 	if err != nil {
-		if registerErr, ok := err.(*RegisterError); ok {
-			http.Error(w, registerErr.Message, http.StatusInternalServerError)
-			return
-		}
-		http.Error(w, "서버 오류", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -304,11 +208,7 @@ func (h *RegisterHandler) HandleRegister(w http.ResponseWriter, r *http.Request)
 
 	// 사용자 등록
 	if err := h.service.RegisterUser(user); err != nil {
-		if registerErr, ok := err.(*RegisterError); ok {
-			http.Error(w, registerErr.Message, http.StatusInternalServerError)
-			return
-		}
-		http.Error(w, "서버 오류", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -316,7 +216,17 @@ func (h *RegisterHandler) HandleRegister(w http.ResponseWriter, r *http.Request)
 		user.Userid, user.Name, user.Role, user.Department)
 
 	// 등록 성공 응답
+	response := model.APIResponse{
+		Success: true,
+		Message: "회원가입이 완료되었습니다",
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+	json.NewEncoder(w).Encode(response)
+}
+
+// Register 사용자 등록 요청을 처리하는 핸들러 함수 (별칭)
+func (h *RegisterHandler) Register(w http.ResponseWriter, r *http.Request) {
+	h.HandleRegister(w, r)
 }

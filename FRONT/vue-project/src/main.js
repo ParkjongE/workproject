@@ -5,7 +5,7 @@ import api from './plugins/axios'
 import styledComponentsPlugin from './plugins/styled-components'
 
 // axios 기본 설정
-api.defaults.baseURL = process.env.VUE_APP_API_URL || 'http://localhost:8081';
+api.defaults.baseURL = process.env.VUE_APP_API_URL || 'http://192.168.0.23:8081';
 
 // 세션 기반 인증을 위한 axios 설정
 api.defaults.withCredentials = true; // 쿠키 포함
