@@ -1,0 +1,60 @@
+-- MySQL dump 10.13  Distrib 8.0.41, for Win64 (x86_64)
+--
+-- Host: localhost    Database: project
+-- ------------------------------------------------------
+-- Server version	8.0.41
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!50503 SET NAMES utf8 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+
+--
+-- Table structure for table `schedules`
+--
+
+DROP TABLE IF EXISTS `schedules`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `schedules` (
+  `schedule_id` int NOT NULL AUTO_INCREMENT,
+  `user_id` int NOT NULL,
+  `title` varchar(200) NOT NULL,
+  `content` text,
+  `project_id` int DEFAULT NULL,
+  `start_time` datetime NOT NULL,
+  `end_time` datetime NOT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `color` varchar(20) DEFAULT '#4CAF50',
+  PRIMARY KEY (`schedule_id`),
+  KEY `idx_user_id` (`user_id`),
+  CONSTRAINT `fk_schedules_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=43 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `schedules`
+--
+
+LOCK TABLES `schedules` WRITE;
+/*!40000 ALTER TABLE `schedules` DISABLE KEYS */;
+INSERT INTO `schedules` VALUES (13,1,'yyyy','yyyyy',0,'2025-07-25 12:00:00','2025-07-25 13:00:00','2025-07-28 04:48:04','#FFEB3B'),(14,1,'ghf','HGDJHGFDFHGJ',0,'2025-07-25 14:00:00','2025-07-25 15:00:00','2025-07-28 04:48:52','#4CAF50'),(16,1,'asdasd','asdasdsad',0,'2025-07-28 05:00:00','2025-07-28 06:03:00','2025-07-28 08:04:41','#FF9800'),(17,1,'sadsadas','asdasdasd',0,'2025-07-28 07:00:00','2025-07-28 08:30:00','2025-07-28 08:05:03','#4CAF50'),(19,1,'xadf','',0,'2025-07-25 02:00:00','2025-07-25 05:00:00','2025-07-29 08:28:30','#2196F3'),(21,1,'송이 주간보호센터 방문','',0,'2025-08-07 16:00:00','2025-08-07 17:00:00','2025-08-07 06:42:30','#F44336'),(22,1,'박종희님 교육','',0,'2025-08-07 16:00:00','2025-08-07 19:00:00','2025-08-07 06:44:02','#795548'),(24,1,'점심','점심',NULL,'2025-08-13 00:00:00','2025-08-13 13:00:00','2025-08-13 04:47:06','#F44336'),(25,1,'에러 수정','에러 수정',NULL,'2025-08-13 15:00:00','2025-08-13 17:00:00','2025-08-13 06:57:58','#4CAF50'),(26,1,'코드 repository 폴더 생성 후 분리','',NULL,'2025-08-14 09:00:00','2025-08-14 00:00:00','2025-08-14 04:11:30','#00BCD4'),(33,1,'성현요양방문','',NULL,'2025-08-18 09:30:00','2025-08-18 00:00:00','2025-08-18 04:57:45','#4CAF50'),(35,1,'asdf','asdfsafd',NULL,'2025-08-13 17:00:00','2025-08-13 19:00:00','2025-08-18 08:40:17','#2196F3'),(36,21,'asd','asd',NULL,'2025-08-19 00:00:00','2025-08-19 14:00:00','2025-08-19 08:35:20','#F44336'),(37,1,'점심','',NULL,'2025-08-21 00:00:00','2025-08-21 13:00:00','2025-08-21 04:11:35','#9C27B0'),(39,21,'asdf','sadfasdf',NULL,'2025-08-21 14:00:00','2025-08-21 16:00:00','2025-08-21 06:49:17','#4CAF50'),(40,1,'asf','asf',NULL,'2025-08-21 14:00:00','2025-08-21 15:00:00','2025-08-21 07:00:07','#4CAF50'),(41,26,'asdf','asdf',NULL,'2025-08-21 14:00:00','2025-08-21 16:00:00','2025-08-21 07:20:15','#F44336'),(42,1,'s','ssd',NULL,'2025-08-21 16:30:00','2025-08-21 19:00:00','2025-08-21 07:38:33','#4CAF50');
+/*!40000 ALTER TABLE `schedules` ENABLE KEYS */;
+UNLOCK TABLES;
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+
+/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
+/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
+/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
+
+-- Dump completed on 2025-08-21 17:25:55
