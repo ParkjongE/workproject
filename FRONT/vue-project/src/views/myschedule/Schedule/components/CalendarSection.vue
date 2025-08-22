@@ -78,6 +78,14 @@ export default {
     mySchedules: {
       type: Array,
       default: () => []
+    },
+    isOtherMember: {
+      type: Boolean,
+      default: false
+    },
+    memberData: {
+      type: Object,
+      default: null
     }
   },
   emits: ['day-selected', 'schedule-selected'],

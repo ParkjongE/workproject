@@ -49,23 +49,59 @@
             <ScheduleDescription>{{ schedule.description }}</ScheduleDescription>
           </ScheduleTooltip>
         </ScheduleSegment>
-        <!-- 일정 추가 모달 -->
+        <!-- 일정 추가/요청 모달 -->
         <ModalOverlay v-if="showQuickAddForm" @click="closeQuickAddForm">
           <QuickAddForm :style="getQuickAddFormStyle()" class="quick-add-form" @click.stop>
             <QuickAddHeader>
-              <QuickAddTitle>{{ isEditing ? '일정 수정' : '일정 추가' }}</QuickAddTitle>
+              <QuickAddTitle>{{ isEditing ? '일정 수정' : (isOtherMember ? '일정 요청' : '일정 추가') }}</QuickAddTitle>
               <QuickAddClose @click.stop="closeQuickAddForm">×</QuickAddClose>
             </QuickAddHeader>
+            
+            <!-- 요청 유형 선택 (다른 구성원일 때만 표시) -->
+            <div v-if="isOtherMember && !isEditing" style="margin-bottom: 16px;">
+              <div style="margin-bottom: 8px; font-weight: 600; color: #333;">요청 유형:</div>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                <button
+                  v-for="type in requestTypes"
+                  :key="type.value"
+                  @click="requestType = type.value"
+                  :style="{
+                    padding: '8px 16px',
+                    border: `2px solid ${requestType === type.value ? type.color : '#ddd'}`,
+                    borderRadius: '20px',
+                    backgroundColor: requestType === type.value ? type.color : 'white',
+                    color: requestType === type.value ? 'white' : '#333',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: requestType === type.value ? '600' : '400',
+                    transition: 'all 0.2s ease'
+                  }"
+                >
+                  {{ type.label }}
+                </button>
+              </div>
+            </div>
+            
+            <!-- 디버깅용 (나중에 제거) -->
+            <div v-if="isOtherMember" style="margin-bottom: 8px; padding: 8px; background-color: #f0f0f0; border-radius: 4px; font-size: 12px; color: #666;">
+              Debug: isOtherMember = {{ isOtherMember }}, memberData = {{ memberData?.name || '없음' }}
+            </div>
+            
+            <!-- 요청 유형 선택 테스트 (항상 표시) -->
+            <div style="margin-bottom: 8px; padding: 8px; background-color: #e8f5e8; border-radius: 4px; font-size: 12px; color: #333;">
+              Test: isOtherMember = {{ isOtherMember }}, memberData = {{ memberData?.name || '없음' }}
+            </div>
+            
             <input
               type="text"
               v-model="quickAddForm.title"
-              placeholder="일정 제목을 입력하세요"
+              :placeholder="isOtherMember ? '요청 제목을 입력하세요' : '일정 제목을 입력하세요'"
               @keyup.enter="saveQuickSchedule"
               style="width:100%;margin-bottom:8px;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:14px;"
             />
             <textarea
               v-model="quickAddForm.description"
-              placeholder="일정 내용을 입력하세요"
+              :placeholder="isOtherMember ? '요청 내용을 입력하세요' : '일정 내용을 입력하세요'"
               rows="3"
               style="width:100%;margin-bottom:8px;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:14px;resize:vertical;"
             ></textarea>
@@ -110,7 +146,9 @@
               </ColorOptionsContainer>
             </ColorSection>
             <QuickAddActions>
-              <QuickAddBtn class="save" @click="saveQuickSchedule">{{ isEditing ? '수정' : '추가' }}</QuickAddBtn>
+              <QuickAddBtn class="save" @click="saveQuickSchedule">
+                {{ isEditing ? '수정' : (isOtherMember ? '요청 보내기' : '추가') }}
+              </QuickAddBtn>
               <QuickAddBtn class="cancel" @click.stop="closeQuickAddForm">닫기</QuickAddBtn>
             </QuickAddActions>
           </QuickAddForm>
@@ -146,7 +184,7 @@ import * as styled from '../Schedule.styled.js';
 //
 import { useSchedule } from '../composables/useSchedule';
 import { useClock } from '../composables/useClock';
-import { computed, ref } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 
 // Utils
 import { formatDate, formatTime } from '../utils/formatters';
@@ -164,6 +202,14 @@ export default {
     mySchedules: {
       type: Array,
       default: () => []
+    },
+    isOtherMember: {
+      type: Boolean,
+      default: false
+    },
+    memberData: {
+      type: Object,
+      default: null
     }
   },
   emits: ['schedule-selected', 'schedule-edited', 'schedule-deleted', 'schedule-added'],
@@ -215,14 +261,30 @@ export default {
     // 수정 모드 상태
     const isEditing = ref(false);
     const editingScheduleId = ref(null);
+    
+    // 요청 유형 (다른 구성원일 때 사용)
+    const requestType = ref('meeting');
+    const requestTypes = [
+      { value: 'meeting', label: '🤝 회의', color: '#FF6B6B' },
+      { value: 'collaboration', label: '💼 업무 협업', color: '#4ECDC4' },
+      { value: 'discussion', label: '💬 논의', color: '#45B7D1' },
+      { value: 'other', label: '📝 기타', color: '#9B59B6' }
+    ];
 
     // getDaySchedules를 computed로 만들어서 props 변경 시 자동 업데이트
     const daySchedules = computed(() => {
       console.log('[ClockSection] daySchedules computed 실행, mySchedules:', props.mySchedules.length);
       return getDaySchedules(props.selectedDate) || [];
     });
+    
+    // mounted 라이프사이클 추가
+    onMounted(() => {
+      console.log('[ClockSection] mounted 실행');
+      console.log('[ClockSection] isOtherMember:', props.isOtherMember);
+      console.log('[ClockSection] memberData:', props.memberData);
+    });
 
-    // 빠른 일정 저장 (추가/수정)
+    // 빠른 일정 저장 (추가/수정) 또는 요청
     const saveQuickSchedule = async () => {
       if (!quickAddForm.value.title || !quickAddForm.value.title.trim()) {
         alert('일정 제목을 입력해주세요.');
@@ -277,8 +339,26 @@ export default {
         } else {
           alert('일정 수정에 실패했습니다.');
         }
+      } else if (props.isOtherMember) {
+        // 다른 구성원에게 일정 요청 모드
+        const requestData = {
+          ...scheduleData,
+          requestType: requestType.value,
+          requestTypeLabel: requestTypes.find(t => t.value === requestType.value)?.label || '기타',
+          targetMember: props.memberData?.name || '구성원',
+          requester: user_id
+        };
+        
+        console.log('[일정요청] 요청할 데이터:', requestData);
+        console.log('[일정요청] 대상 구성원:', props.memberData?.name);
+        console.log('[일정요청] 요청 유형:', requestType.value);
+        
+        // 요청 완료 메시지 표시
+        alert(`${props.memberData?.name || '구성원'}님께 ${requestTypes.find(t => t.value === requestType.value)?.label || '일정'} 요청이 전송되었습니다.`);
+        closeQuickAddForm();
+        emit('schedule-added');
       } else {
-        // 추가 모드
+        // 본인 일정 추가 모드
         console.log('[일정추가] 추가할 데이터:', scheduleData);
         success = await addSchedule(scheduleData);
         

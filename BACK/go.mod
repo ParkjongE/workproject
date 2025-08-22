@@ -14,10 +14,9 @@ require (
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/golang-jwt/jwt/v5 v5.2.3 // indirect
+	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/gorilla/securecookie v1.1.2 // indirect
 )
 
 //프로젝트의 의존성 관리 파일
 //프로젝트 모듈 선언 + 모든 외부 패키지 버전 관리 파일
-
-

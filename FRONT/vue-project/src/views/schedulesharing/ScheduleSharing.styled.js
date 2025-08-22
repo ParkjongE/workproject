@@ -60,11 +60,14 @@ export const MemberNode = styled.div`
   justify-content: flex-start;
   padding: 6px;
   cursor: move;
-  transition: all 0.3s ease;
+  transition: all 0.5s ease-in-out;
   transform: translate(-50%, -50%);
   z-index: 1;
   &:hover {
     transform: translate(-50%, -50%) scale(1.05);
+  }
+  &:active {
+    transition: none;
   }
   &.selected {
     outline: 3px solid #4CAF50;
@@ -329,9 +332,10 @@ export const ScheduleTooltip = styled.div`
   padding: 8px;
   border-radius: 4px;
   font-size: 12px;
-  z-index: 10;
-  pointer-events: none;
+  z-index: 50;
+  pointer-events: auto;
   white-space: nowrap;
+  min-width: 150px;
 `;
 
 export const TodaySchedules = styled.div`
@@ -871,4 +875,283 @@ export const ProjectName = styled.div`
 export const ProjectPeriod = styled.div`
   font-size: 10px;
   color: #666;
+`;
+
+// 빈 시간 슬롯 관련 스타일
+export const EmptyTimeSlot = styled.div`
+  width: 20px;
+  height: 20px;
+  border: 2px dashed #ddd;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: rgba(255, 255, 255, 0.8);
+  
+  &:hover {
+    border-color: #4ECDC4;
+    background: #e8f8f7;
+    transform: scale(1.2);
+  }
+`;
+
+export const PlusIcon = styled.span`
+  font-size: 12px;
+  color: #999;
+  font-weight: bold;
+  
+  ${EmptyTimeSlot}:hover & {
+    color: #4ECDC4;
+  }
+`;
+
+// 빠른 미팅 모달 관련 스타일
+export const QuickMeetingModal = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+`;
+
+export const ModalOverlay = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+`;
+
+export const QuickModalContent = styled.div`
+  background: white;
+  border-radius: 12px;
+  width: 400px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  position: relative;
+`;
+
+export const QuickModalHeader = styled.div`
+  padding: 20px 20px 0 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  
+  h3 {
+    margin: 0;
+    font-size: 18px;
+    color: #333;
+  }
+`;
+
+export const CloseButton = styled.button`
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #999;
+  
+  &:hover {
+    color: #333;
+  }
+`;
+
+export const QuickModalBody = styled.div`
+  padding: 20px;
+`;
+
+export const TimeInfo = styled.div`
+  background: #f8f9fa;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-weight: 500;
+  color: #333;
+`;
+
+export const QuickForm = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  
+  input, select {
+    padding: 12px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 14px;
+    
+    &:focus {
+      outline: none;
+      border-color: #4ECDC4;
+    }
+  }
+`;
+
+export const QuickModalFooter = styled.div`
+  padding: 0 20px 20px 20px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+`;
+
+export const CancelButton = styled.button`
+  padding: 10px 20px;
+  border: 2px solid #e0e0e0;
+  background: white;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  
+  &:hover {
+    background: #f5f5f5;
+  }
+`;
+
+export const AddButton = styled.button`
+  padding: 10px 20px;
+  background: #4ECDC4;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  cursor: pointer;
+  font-weight: 500;
+  
+  &:hover:not(:disabled) {
+    background: #45b7aa;
+  }
+  
+  &:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+  }
+`;
+
+// 일정 수정/삭제 버튼 스타일
+export const ScheduleEditActions = styled.div`
+  margin-top: 8px;
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  position: relative;
+  z-index: 100;
+  
+  .edit-btn, .delete-btn {
+    background: rgba(255, 255, 255, 0.95);
+    border: 2px solid #ddd;
+    padding: 8px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: all 0.2s;
+    min-width: 35px;
+    height: 35px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    z-index: 101;
+    pointer-events: auto;
+    
+    &:hover {
+      transform: scale(1.15);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+      z-index: 102;
+    }
+    
+    &:active {
+      transform: scale(0.9);
+    }
+  }
+  
+  .edit-btn:hover {
+    background: rgba(76, 175, 80, 0.2);
+    border-color: #4CAF50;
+    color: #2E7D32;
+  }
+  
+  .delete-btn:hover {
+    background: rgba(244, 67, 54, 0.2);
+    border-color: #f44336;
+    color: #C62828;
+  }
+`;
+
+// 드래그 투 셀렉트 관련 스타일
+export const TimeSlot = styled.div`
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  pointer-events: all;
+  transition: background-color 0.2s ease;
+  
+  &.selected {
+    background-color: rgba(76, 175, 80, 0.3);
+    border: 2px solid #4CAF50;
+  }
+`;
+
+export const DragSelection = styled.div`
+  position: absolute;
+  background: rgba(76, 205, 196, 0.2);
+  border: 2px solid #4ECDC4;
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 10;
+`; 
+
+export const LoadingOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+`;
+
+export const LoadingSpinner = styled.div`
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  font-size: 16px;
+  color: #333;
+`;
+
+export const ErrorMessage = styled.div`
+  background: #ffebee;
+  border: 1px solid #f44336;
+  border-radius: 8px;
+  padding: 16px;
+  margin: 16px;
+  text-align: center;
+  
+  p {
+    color: #d32f2f;
+    margin: 0 0 12px 0;
+  }
+`;
+
+export const RetryButton = styled.button`
+  background: #f44336;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  
+  &:hover {
+    background: #d32f2f;
+  }
 `; 

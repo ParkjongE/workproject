@@ -3,8 +3,14 @@
     <SideBar />
     <ContentArea>
       <h1>개인 일정 공유</h1>
+      
       <DashboardContainer>
-        <GraphView ref="graphView" class="graph-view">
+        <GraphView 
+          ref="graphView" 
+          class="graph-view"
+          @dragover="handleDragOver"
+          @drop="handleDrop"
+        >
           <!-- 부서별 경계 -->
           <DepartmentBoundary 
             v-for="department in departments" 
@@ -17,7 +23,7 @@
           <!-- 본인 노드 (고정 위치) -->
           <MyNode
             :style="getMyNodePosition()"
-            @dblclick="expandMemberSchedule(myProfile.id)"
+            @click.stop="selectMember(myProfile.id)"
           >
             <MemberInfo>
               <MemberPosition>{{ myProfile.position }} | {{ myProfile.department }} {{ myProfile.team }}</MemberPosition>
@@ -69,21 +75,21 @@
           <MemberNode
             v-for="(member, index) in teamMembers" 
             :key="member.id"
+            :data-member-id="member.id"
             :style="getNodePosition(index)"
             :class="{ 'selected': selectedMember === member.id }"
-            @click="selectMember(member.id)"
-            @dblclick="expandMemberSchedule(member.id)"
+            @click.stop="selectMember(member.id)"
             draggable="true"
-            @dragstart="dragStart($event, member.id)"
-            @dragend="dragEnd"
+            @dragstart="handleDragStart($event, member.id)"
+            @dragend="handleDragEnd"
           >
             <MemberInfo>
-              <MemberPosition>{{ member.position }} | {{ member.department }} {{ member.team }}</MemberPosition>
+              <MemberPosition>{{ member.role }} | {{ member.department }}</MemberPosition>
               <MemberName>{{ member.name }}</MemberName>
             </MemberInfo>
             <ScheduleViews>
               <!-- 미니 시계 뷰 -->
-              <MiniClockView @click.stop="showClockView(member.id)">
+              <MiniClockView>
                 <MiniClock>
                   <ClockFace>
                     <!-- 시간 숫자 -->
@@ -99,7 +105,7 @@
               </MiniClockView>
               
               <!-- 미니 달력 뷰 -->
-              <MiniCalendarView @click.stop="showCalendarView(member.id)">
+              <MiniCalendarView>
                 <MiniCalendar>
                   <MiniCalendarGrid>
                     <!-- 요일 헤더 -->
@@ -119,6 +125,11 @@
                 </MiniCalendar>
               </MiniCalendarView>
             </ScheduleViews>
+            
+            <!-- 디버깅용 정보 표시 -->
+            <div style="position: absolute; top: -20px; left: 0; font-size: 10px; color: red; background: white; padding: 2px;">
+              ID: {{ member.id }}
+            </div>
           </MemberNode>
         </GraphView>
       </DashboardContainer>
@@ -136,277 +147,178 @@
         </ModalContent>
       </ExpandedScheduleModal>
 
-      <!-- 확대된 일정 뷰 모달 -->
+      <!-- 확대된 일정 뷰 모달 (다른 구성원) -->
       <ExpandedScheduleModal v-if="showExpandedView">
-        <ModalContent>
+        <ModalContent style="max-width: 95vw; max-height: 95vh; width: 95vw; height: 95vh;">
           <ModalHeader>
             <h2>{{ expandedMember.name }}의 일정</h2>
             <CloseBtn @click="closeExpandedView">×</CloseBtn>
           </ModalHeader>
-          <ModalBody>
-            <ExpandedViews>
-              <!-- 왼쪽: 시계 -->
-              <ExpandedClockContainer>
-                <!-- expanded-date-label 제거 -->
-                <ExpandedClock>
-                  <ExpandedClockFace>
-                    <!-- 시간 숫자 -->
-                    <ExpandedHourNumber v-for="hour in 12" :key="`hour-${hour}`" :style="getExpandedHourNumberStyle(hour)">
-                      {{ hour }}
-                    </ExpandedHourNumber>
-                    
-                    <!-- 일정 세그먼트 - 선택된 날짜의 일정 표시 -->
-                    <ExpandedScheduleSegment v-for="(schedule, idx) in getSelectedDateSchedules()" :key="`schedule-${idx}`" 
-                      :style="getExpandedScheduleStyle(schedule)"
-                      @click="selectSchedule(schedule)">
-                      <ScheduleTooltip>
-                        <div class="schedule-time">
-                          {{ formatTime(schedule.start) }} - {{ formatTime(schedule.end) }}
-                        </div>
-                        <div class="schedule-title">{{ schedule.title }}</div>
-                      </ScheduleTooltip>
-                    </ExpandedScheduleSegment>
-                  </ExpandedClockFace>
-                </ExpandedClock>
+          <ModalBody style="height: calc(100% - 60px); overflow: auto;">
+            <Schedule 
+              :hideSideBar="true" 
+              :memberData="expandedMember"
+              :isOtherMember="true"
+            />
+
+
                 
-                <!-- view-title도 제거 -->
-                <TodaySchedules>
-                  <TodayScheduleItem 
-                    v-for="(schedule, idx) in getSelectedDateSchedules()" 
-                    :key="`today-${idx}`"
-                    :class="{ 'selected': selectedSchedule && selectedSchedule.id === schedule.id }"
-                    @click="selectSchedule(schedule)"
-                  >
-                    <ScheduleColorDot :style="{ backgroundColor: schedule.color }"></ScheduleColorDot>
-                    <ScheduleInfo>
-                      <ScheduleTimeRange>{{ formatTime(schedule.start) }} - {{ formatTime(schedule.end) }}</ScheduleTimeRange>
-                      <ScheduleTitle>{{ schedule.title }}</ScheduleTitle>
-                    </ScheduleInfo>
-                  </TodayScheduleItem>
-                  <NoSchedules v-if="getSelectedDateSchedules().length === 0">
-                    해당 날짜에 일정이 없습니다.
-                  </NoSchedules>
-                </TodaySchedules>
-              </ExpandedClockContainer>
-              <!-- 가운데: info-section(연차/출퇴근/급여명세서) -->
-              <AdditionalInfoContainer>
-                <!-- info-section(연차/출퇴근/급여명세서) -->
-                <InfoSection class="leave-info-compact">
-                  <SectionHeaderWithPrivacy>
-                    <SectionTitle>연차 정보</SectionTitle>
-                    <PrivacyStatus class="public">
-                      <span>공개</span>
-                    </PrivacyStatus>
-                  </SectionHeaderWithPrivacy>
-                  <LeaveItem>
-                    <LeaveLabel>부여된 연차:</LeaveLabel>
-                    <LeaveValue>{{ expandedMember.totalLeave || 15 }}일</LeaveValue>
-                  </LeaveItem>
-                  <LeaveItem>
-                    <LeaveLabel>사용한 연차:</LeaveLabel>
-                    <LeaveValue>{{ expandedMember.usedLeave || 5 }}일</LeaveValue>
-                  </LeaveItem>
-                  <LeaveItem>
-                    <LeaveLabel>남은 연차:</LeaveLabel>
-                    <LeaveValue>{{ (expandedMember.totalLeave || 15) - (expandedMember.usedLeave || 5) }}일</LeaveValue>
-                  </LeaveItem>
-                </InfoSection>
+
                 
-                <!-- 출퇴근 정보 -->
-                <InfoSection class="attendance-info">
-                  <SectionHeaderWithPrivacy>
-                    <h4>오늘의 출퇴근</h4>
-                    <PrivacyStatus class="public">
-                      <span>공개</span>
-                    </PrivacyStatus>
-                  </SectionHeaderWithPrivacy>
-                  <AttendanceStatus>
-                    <StatusItem>
-                      <StatusLabel>출근 시간:</StatusLabel>
-                      <StatusValue>{{ expandedMember.todayAttendance?.checkInTime || '09:05' }}</StatusValue>
-                    </StatusItem>
-                    <StatusItem>
-                      <StatusLabel>퇴근 시간:</StatusLabel>
-                      <StatusValue>{{ expandedMember.todayAttendance?.checkOutTime || '18:10' }}</StatusValue>
-                    </StatusItem>
-                    <StatusItem>
-                      <StatusLabel>근무 시간:</StatusLabel>
-                      <StatusValue>{{ expandedMember.workingHours || '9시간 5분' }}</StatusValue>
-                    </StatusItem>
-                  </AttendanceStatus>
-                </InfoSection>
-                
-                <!-- 급여명세서 -->
-                <InfoSection class="salary-info">
-                  <div class="salary-header">
-                    <SectionHeaderWithPrivacy>
-                      <h4>급여명세서</h4>
-                      <PrivacyStatus class="private">
-                        <span>비공개</span>
-                      </PrivacyStatus>
-                    </SectionHeaderWithPrivacy>
-                  </div>
-                  <SalaryYears>
-                    <SalaryYear class="active">
-                      <YearHeader>
-                        <span>2023년</span>
-                        <YearActions>
-                          <DownloadAllBtn title="모두 다운로드">
-                            <DownloadAllIcon>↓↓</DownloadAllIcon>
-                          </DownloadAllBtn>
-                        </YearActions>
-                      </YearHeader>
-                      <SalaryMonths>
-                        <SalaryMonth>
-                          <span>6월</span>
-                          <DownloadIcon>↓</DownloadIcon>
-                        </SalaryMonth>
-                        <SalaryMonth>
-                          <span>5월</span>
-                          <DownloadIcon>↓</DownloadIcon>
-                        </SalaryMonth>
-                      </SalaryMonths>
-                    </SalaryYear>
-                  </SalaryYears>
-                </InfoSection>
-              </AdditionalInfoContainer>
-              <!-- 오른쪽: 달력 -->
-              <ExpandedCalendarContainer>
-                <CalendarHeader>
-                  <button @click="prevMonth">&lt;</button>
-                  <h3>{{ currentYear }}년 {{ currentMonth + 1 }}월</h3>
-                  <button @click="nextMonth">&gt;</button>
-                </CalendarHeader>
-                <CalendarGrid>
-                  <WeekdayHeader v-for="day in weekdays" :key="day">{{ day }}</WeekdayHeader>
-                  <CalendarDay 
-                    v-for="day in calendarDays" 
-                    :key="day.date"
-                    :class="{ 
-                      'other-month': !day.isCurrentMonth,
-                      'selected-date': getCurrentSelectedDate() === day.date,
-                      'project-active': isProjectActive(day.date)
-                    }"
-                    @click="selectDate(day.date)"
-                  >
-                    <DayNumber>{{ day.dayNumber }}</DayNumber>
-                    
-                    <!-- 프로젝트 선 표시 -->
-                    <ProjectLine v-if="isProjectActive(day.date)"
-                         :style="{ backgroundColor: getProjectForDate(day.date)?.color || '#B4D3F5' }">
-                    </ProjectLine>
-                    
-                    <DaySchedules>
-                      <DayScheduleItem 
-                        v-for="(schedule, idx) in getDaySchedules(day.date)" 
-                        :key="idx"
-                        :style="{ backgroundColor: schedule.color }"
-                        @click.stop="selectSchedule(schedule)"
-                      >
-                        {{ schedule.title }}
-                      </DayScheduleItem>
-                    </DaySchedules>
-                  </CalendarDay>
-                </CalendarGrid>
-                
-                <!-- 주간 일정 표시 -->
-                <WeekView>
-                  <WeekHeader>
-                    <WeekDayHeader v-for="day in weekdays" :key="`week-${day}`">{{ day }}</WeekDayHeader>
-                  </WeekHeader>
-                  <WeekBody>
-                    <WeekRow v-for="(weekSchedules, weekIdx) in getWeekSchedules()" :key="`week-${weekIdx}`">
-                      <WeekDay v-for="(daySchedules, dayIdx) in weekSchedules" :key="`day-${dayIdx}`">
-                        <WeekScheduleLine 
-                          v-for="(schedule, scheduleIdx) in daySchedules" 
-                          :key="`schedule-${scheduleIdx}`"
-                          :style="{ 
-                            backgroundColor: schedule.color,
-                            top: `${(scheduleIdx * 4) + 2}px`
-                          }"
-                          @click="selectSchedule(schedule)"
-                        ></WeekScheduleLine>
-                      </WeekDay>
-                    </WeekRow>
-                  </WeekBody>
-                </WeekView>
-              </ExpandedCalendarContainer>
-            </ExpandedViews>
-            
-            <ScheduleDetails v-if="selectedSchedule">
-              <h3>{{ selectedSchedule.title }}</h3>
-              <p>{{ formatDate(selectedSchedule.start) }} {{ formatTime(selectedSchedule.start) }} - {{ formatTime(selectedSchedule.end) }}</p>
-            </ScheduleDetails>
-            
-            <!-- 선택된 날짜 정보 표시 -->
-            <SelectedDateInfo v-if="selectedDate">
-              <h3>{{ formatSelectedDate(selectedDate) }} 일정</h3>
-              <DateSchedules>
-                <DateScheduleItem 
-                  v-for="(schedule, idx) in getDaySchedules(selectedDate)" 
-                  :key="idx"
-                  :class="{ 'selected': selectedSchedule && selectedSchedule.id === schedule.id }"
-                  @click="selectSchedule(schedule)"
-                >
-                  <ScheduleTime>{{ formatTime(schedule.start) }} - {{ formatTime(schedule.end) }}</ScheduleTime>
-                  <ScheduleTitle>{{ schedule.title }}</ScheduleTitle>
-                </DateScheduleItem>
-                <NoSchedules v-if="getDaySchedules(selectedDate).length === 0">
-                  해당 날짜에 일정이 없습니다.
-                </NoSchedules>
-              </DateSchedules>
-            </SelectedDateInfo>
-            
-            <ScheduleActions>
-              <AddBtn @click="addSchedule">일정 추가</AddBtn>
-              <EditBtn @click="editSchedule" :disabled="!selectedSchedule">일정 수정</EditBtn>
-            </ScheduleActions>
-            
-            <!-- 모달 하단 프로젝트 정보 -->
-            <ModalBottomProjects>
-              <h4>진행 중인 프로젝트</h4>
-              <ProjectList>
-                <ProjectInfo v-for="project in projects" :key="project.id">
-                  <ProjectLinePreview :style="{ backgroundColor: project.color }"></ProjectLinePreview>
-                  <ProjectDetails>
-                    <ProjectName>{{ project.title }}</ProjectName>
-                    <ProjectPeriod>{{ formatProjectDate(project.startDate) }} - {{ formatProjectDate(project.endDate) }}</ProjectPeriod>
-                  </ProjectDetails>
-                </ProjectInfo>
-              </ProjectList>
-            </ModalBottomProjects>
+
+
+
           </ModalBody>
         </ModalContent>
       </ExpandedScheduleModal>
     </ContentArea>
+    
+    <!-- 빠른 미팅 요청 모달 -->
+    <QuickMeetingModal v-if="showQuickModal" @close="closeQuickModal">
+      <ModalOverlay @click="closeQuickModal" />
+      <QuickModalContent @click.stop>
+        <QuickModalHeader>
+          <h3>{{ expandedMember ? expandedMember.name : '' }}님께 미팅 요청</h3>
+          <CloseButton @click="closeQuickModal">×</CloseButton>
+        </QuickModalHeader>
+        
+        <QuickModalBody>
+          <TimeInfo>
+            📅 {{ formatDate(getCurrentSelectedDate()) }} {{ selectedTimeSlot ? selectedTimeSlot.hour : 0 }}:00 - {{ selectedTimeSlot ? (selectedTimeSlot.endHour || selectedTimeSlot.hour + 1) : 1 }}:00
+          </TimeInfo>
+          
+          <QuickForm>
+            <input 
+              v-model="quickMeeting.title" 
+              type="text" 
+              placeholder="미팅 제목 (예: 프로젝트 논의)"
+              @keyup.enter="addQuickMeeting"
+            />
+            
+            <select v-model="quickMeeting.type">
+              <option value="meeting">🤝 회의</option>
+              <option value="work">💼 업무 협업</option>
+              <option value="other">📋 기타</option>
+            </select>
+          </QuickForm>
+        </QuickModalBody>
+        
+        <QuickModalFooter>
+          <CancelButton @click="closeQuickModal">취소</CancelButton>
+          <AddButton @click="addQuickMeeting" :disabled="!quickMeeting.title">
+            요청 보내기
+          </AddButton>
+        </QuickModalFooter>
+      </QuickModalContent>
+    </QuickMeetingModal>
+    
+    <!-- 일정 수정 모달 -->
+    <QuickMeetingModal v-if="showEditModal" @close="closeEditModal">
+      <ModalOverlay @click="closeEditModal" />
+      <QuickModalContent @click.stop>
+        <QuickModalHeader>
+          <h3>일정 수정</h3>
+          <CloseButton @click="closeEditModal">×</CloseButton>
+        </QuickModalHeader>
+        
+        <QuickModalBody>
+          <TimeInfo>
+            📅 {{ formatDate(getCurrentSelectedDate()) }} {{ editingSchedule.hour }}:00 - {{ editingSchedule.hour + 1 }}:00
+          </TimeInfo>
+          
+          <QuickForm>
+            <input 
+              v-model="editingSchedule.title" 
+              type="text" 
+              placeholder="일정 제목"
+              @keyup.enter="updateScheduleRequest"
+            />
+            
+            <select v-model="editingSchedule.type">
+              <option value="meeting">🤝 회의</option>
+              <option value="work">💼 업무 협업</option>
+              <option value="other">📋 기타</option>
+            </select>
+          </QuickForm>
+        </QuickModalBody>
+        
+        <QuickModalFooter>
+          <CancelButton @click="closeEditModal">취소</CancelButton>
+          <AddButton @click="updateScheduleRequest" :disabled="!editingSchedule.title">
+            수정 완료
+          </AddButton>
+        </QuickModalFooter>
+      </QuickModalContent>
+    </QuickMeetingModal>
+
+    <!-- 로딩 상태 표시 -->
+    <div v-if="isLoadingTeamMembers" class="loading-overlay">
+      <div class="loading-spinner">팀원 데이터 로딩 중...</div>
+    </div>
+
+    <!-- 에러 상태 표시 -->
+    <div v-if="teamMembersError" class="error-message">
+      <p>팀원 데이터 로드 실패: {{ teamMembersError }}</p>
+      <button @click="loadTeamMembers" class="retry-button">다시 시도</button>
+    </div>
   </ScheduleSharingRoot>
 </template>
 
 <script>
 import SideBar from '@/components/SideBar.vue';
 import Schedule from '@/views/myschedule/Schedule/Schedule.vue';
-import api from '@/plugins/axios.js';
+// import { useScheduleStore } from '@/stores/schedule'
+import  * as ScheduleSharing from './ScheduleSharing.styled.js';
+import { 
+  handleDragStart as dragStartHandler, 
+  handleDragEnd as dragEndHandler, 
+  handleDragOver as dragOverHandler, 
+  handleNodeDrop as nodeDropHandler, 
+  updateNodePosition as updateNodePositionHandler 
+} from './utils/drag.js';
 import {
-  ScheduleSharingRoot, ContentArea, DashboardContainer, GraphView, DepartmentBoundary, DepartmentLabel, MemberNode, MyNode, MemberInfo, MemberPosition, MemberName, ScheduleViews, MiniClockView, MiniClock, ClockFace, HourNumber, ScheduleSegment, MiniCalendarView, MiniCalendar, MiniCalendarGrid, MiniDayHeader, MiniDayCell, MiniDayNumber, MiniDayEvent, MiniProjectLine,
-  ExpandedScheduleModal, ModalContent, ModalHeader, CloseBtn, ModalBody, ExpandedViews, ExpandedClockContainer, ExpandedClock, ExpandedClockFace, ExpandedHourNumber, ExpandedScheduleSegment, ScheduleTooltip, TodaySchedules, TodayScheduleItem, ScheduleColorDot, ScheduleInfo, ScheduleTimeRange, ScheduleTitle, NoSchedules, AdditionalInfoContainer, InfoSection, SectionHeaderWithPrivacy, SectionTitle, PrivacyStatus, LeaveItem, LeaveLabel, LeaveValue, AttendanceStatus, StatusItem, StatusLabel, StatusValue,
-  ExpandedCalendarContainer, CalendarHeader, CalendarGrid, WeekdayHeader, CalendarDay, DayNumber, ProjectLine, DaySchedules, DayScheduleItem, WeekView, WeekHeader, WeekDayHeader, WeekBody, WeekRow, WeekDay, WeekScheduleLine,
-  SalaryYears, SalaryYear, YearHeader, YearActions, DownloadAllBtn, DownloadAllIcon, SalaryMonths, SalaryMonth, DownloadIcon,
-  ScheduleDetails, SelectedDateInfo, DateSchedules, DateScheduleItem, ScheduleTime, ScheduleActions, AddBtn, EditBtn,
-  ModalBottomProjects, ProjectList, ProjectInfo, ProjectLinePreview, ProjectDetails, ProjectName, ProjectPeriod
-} from './ScheduleSharing.styled.js';
-
+  editScheduleRequest as editScheduleRequestHandler,
+  updateScheduleRequest as updateScheduleRequestHandler,
+  deleteScheduleRequest as deleteScheduleRequestHandler,
+  isMySchedule as isMyScheduleHandler,
+  editSchedule as editScheduleHandler,
+  getScheduleColorByType as getScheduleColorByTypeHandler,
+  getScheduleType as getScheduleTypeHandler
+} from './utils/Edit_schedules.js';
+import {
+  loadMyProfile as loadMyProfileHandler,
+  loadTeamMembers as loadTeamMembersHandler,
+  loadFallbackTeamMembers as loadFallbackTeamMembersHandler,
+  loadUsersByDepartment as loadUsersByDepartmentHandler,
+  loadUserSchedules as loadUserSchedulesHandler,
+  getPositionFromRole as getPositionFromRoleHandler
+} from './utils/load.js';
+import {
+  expandMemberSchedule as expandMemberScheduleHandler,
+  closeMyScheduleModal as closeMyScheduleModalHandler,
+  closeExpandedView as closeExpandedViewHandler,
+  showClockView as showClockViewHandler,
+  showCalendarView as showCalendarViewHandler,
+  openQuickMeetingModal as openQuickMeetingModalHandler,
+  closeQuickModal as closeQuickModalHandler,
+  closeEditModal as closeEditModalHandler,
+  openDragScheduleModal as openDragScheduleModalHandler,
+  openUserScheduleModal as openUserScheduleModalHandler
+} from './utils/Modal.js';
 export default {
   name: 'ScheduleSharing',
   components: {
     SideBar,
     Schedule,
-    ScheduleSharingRoot, ContentArea, DashboardContainer, GraphView, DepartmentBoundary, DepartmentLabel, MemberNode, MyNode, MemberInfo, MemberPosition, MemberName, ScheduleViews, MiniClockView, MiniClock, ClockFace, HourNumber, ScheduleSegment, MiniCalendarView, MiniCalendar, MiniCalendarGrid, MiniDayHeader, MiniDayCell, MiniDayNumber, MiniDayEvent, MiniProjectLine,
-    ExpandedScheduleModal, ModalContent, ModalHeader, CloseBtn, ModalBody, ExpandedViews, ExpandedClockContainer, ExpandedClock, ExpandedClockFace, ExpandedHourNumber, ExpandedScheduleSegment, ScheduleTooltip, TodaySchedules, TodayScheduleItem, ScheduleColorDot, ScheduleInfo, ScheduleTimeRange, ScheduleTitle, NoSchedules, AdditionalInfoContainer, InfoSection, SectionHeaderWithPrivacy, SectionTitle, PrivacyStatus, LeaveItem, LeaveLabel, LeaveValue, AttendanceStatus, StatusItem, StatusLabel, StatusValue,
-    ExpandedCalendarContainer, CalendarHeader, CalendarGrid, WeekdayHeader, CalendarDay, DayNumber, ProjectLine, DaySchedules, DayScheduleItem, WeekView, WeekHeader, WeekDayHeader, WeekBody, WeekRow, WeekDay, WeekScheduleLine,
-    SalaryYears, SalaryYear, YearHeader, YearActions, DownloadAllBtn, DownloadAllIcon, SalaryMonths, SalaryMonth, DownloadIcon,
-    ScheduleDetails, SelectedDateInfo, DateSchedules, DateScheduleItem, ScheduleTime, ScheduleActions, AddBtn, EditBtn,
-    ModalBottomProjects, ProjectList, ProjectInfo, ProjectLinePreview, ProjectDetails, ProjectName, ProjectPeriod
+    ...ScheduleSharing
   },
+  //vue3
+  // setup() {
+  //   const scheduleStore = useScheduleStore()
+  //   return { scheduleStore }
+  // },
+  
+  //vue2
   data() {
     return {
       // 일정 유형별 색상 정의
@@ -432,74 +344,13 @@ export default {
         { name: '디자인부', x: 650, y: 300, width: 450, height: 450 },
         { name: '마케팅부', x: 1150, y: 300, width: 450, height: 450 }
       ],
-      teamMembers: [
-        // 개발부
-        { id: 1, name: '김부장', position: '부장', department: '개발부', team: '팀장', schedules: [
-          { id: 1, title: '팀 미팅', start: '2023-06-15T10:00', end: '2023-06-15T11:30', type: 'meeting', color: '#FF6B6B' },
-          { id: 2, title: '고객 미팅', start: '2023-06-15T14:00', end: '2023-06-15T15:30', type: 'meeting', color: '#FF6B6B' },
-          { id: 3, title: '프로젝트 기획', start: '2023-06-16T09:00', end: '2023-06-16T12:00', type: 'work', color: '#4ECDC4' },
-          { id: 12, title: '월간 보고서', start: '2023-06-20T13:00', end: '2023-06-20T15:00', type: 'work', color: '#4ECDC4' },
-          { id: 13, title: '신규 프로젝트 검토', start: '2023-06-22T10:00', end: '2023-06-22T12:00', type: 'other', color: '#45B7D1' }
-        ]},
-        { id: 2, name: '이차장', position: '차장', department: '개발부', team: '백엔드팀', schedules: [
-          { id: 4, title: '팀 미팅', start: '2023-06-15T10:00', end: '2023-06-15T11:30', type: 'meeting', color: '#FF6B6B' },
-          { id: 5, title: '보고서 작성', start: '2023-06-15T13:00', end: '2023-06-15T17:00', type: 'work', color: '#4ECDC4' },
-          { id: 14, title: '클라이언트 미팅', start: '2023-06-19T14:00', end: '2023-06-19T16:00', type: 'meeting', color: '#FF6B6B' },
-          { id: 15, title: '예산 검토', start: '2023-06-21T09:00', end: '2023-06-21T11:00', type: 'other', color: '#45B7D1' }
-        ]},
-        { id: 3, name: '박과장', position: '과장', department: '개발부', team: '프론트엔드팀', schedules: [
-          { id: 6, title: '팀 미팅', start: '2023-06-15T10:00', end: '2023-06-15T11:30', type: 'meeting', color: '#FF6B6B' },
-          { id: 7, title: '데이터 분석', start: '2023-06-16T13:00', end: '2023-06-16T18:00', type: 'work', color: '#4ECDC4' },
-          { id: 16, title: '마케팅 전략 회의', start: '2023-06-18T10:00', end: '2023-06-18T12:00', type: 'meeting', color: '#FF6B6B' },
-          { id: 17, title: '분기별 성과 분석', start: '2023-06-23T13:00', end: '2023-06-23T17:00', type: 'work', color: '#4ECDC4' }
-        ]},
-        { id: 4, name: '최대리', position: '대리', department: '개발부', team: '백엔드팀', schedules: [
-          { id: 8, title: '팀 미팅', start: '2023-06-15T10:00', end: '2023-06-15T11:30', type: 'meeting', color: '#FF6B6B' },
-          { id: 9, title: '디자인 작업', start: '2023-06-17T09:00', end: '2023-06-17T18:00', type: 'work', color: '#4ECDC4' },
-          { id: 18, title: 'UI 디자인 검토', start: '2023-06-19T10:00', end: '2023-06-19T12:00', type: 'other', color: '#45B7D1' },
-          { id: 19, title: '사용자 테스트', start: '2023-06-22T14:00', end: '2023-06-22T16:00', type: 'other', color: '#45B7D1' }
-        ]},
-        
-        // 디자인부
-        { id: 5, name: '정사원', position: '사원', department: '디자인부', team: 'UI팀', schedules: [
-          { id: 10, title: '팀 미팅', start: '2023-06-15T10:00', end: '2023-06-15T11:30', type: 'meeting', color: '#FF6B6B' },
-          { id: 11, title: '코딩 작업', start: '2023-06-15T13:00', end: '2023-06-15T18:00', type: 'work', color: '#4ECDC4' },
-          { id: 20, title: '버그 수정', start: '2023-06-20T09:00', end: '2023-06-20T12:00', type: 'work', color: '#4ECDC4' },
-          { id: 21, title: '코드 리뷰', start: '2023-06-21T14:00', end: '2023-06-21T16:00', type: 'other', color: '#45B7D1' }
-        ]},
-        { id: 6, name: '한부장', position: '부장', department: '디자인부', team: '팀장', schedules: [
-          { id: 22, title: '디자인 리뷰', start: '2023-06-15T09:00', end: '2023-06-15T11:00', type: 'meeting', color: '#FF6B6B' },
-          { id: 23, title: '임원 회의', start: '2023-06-15T14:00', end: '2023-06-15T16:00', type: 'meeting', color: '#FF6B6B' },
-          { id: 24, title: '신규 프로젝트 기획', start: '2023-06-16T10:00', end: '2023-06-16T12:00', type: 'work', color: '#4ECDC4' }
-        ]},
-        { id: 7, name: '윤과장', position: '과장', department: '디자인부', team: 'UX팀', schedules: [
-          { id: 25, title: '사용자 연구', start: '2023-06-15T11:00', end: '2023-06-15T13:00', type: 'work', color: '#4ECDC4' },
-          { id: 26, title: '프로토타입 개발', start: '2023-06-15T15:00', end: '2023-06-15T17:00', type: 'work', color: '#4ECDC4' },
-          { id: 27, title: '사용성 테스트', start: '2023-06-17T10:00', end: '2023-06-17T12:00', type: 'other', color: '#45B7D1' }
-        ]},
-        
-        // 마케팅부
-        { id: 8, name: '조차장', position: '차장', department: '마케팅부', team: '디지털마케팅팀', schedules: [
-          { id: 28, title: '광고 전략 회의', start: '2023-06-15T09:30', end: '2023-06-15T11:00', type: 'meeting', color: '#FF6B6B' },
-          { id: 29, title: '소셜 미디어 분석', start: '2023-06-15T13:30', end: '2023-06-15T15:30', type: 'work', color: '#4ECDC4' },
-          { id: 30, title: '캠페인 기획', start: '2023-06-16T14:00', end: '2023-06-16T16:00', type: 'work', color: '#4ECDC4' }
-        ]},
-        { id: 9, name: '임대리', position: '대리', department: '마케팅부', team: '브랜드마케팅팀', schedules: [
-          { id: 31, title: '브랜드 전략 회의', start: '2023-06-15T11:00', end: '2023-06-15T12:30', type: 'meeting', color: '#FF6B6B' },
-          { id: 32, title: '콘텐츠 기획', start: '2023-06-15T15:00', end: '2023-06-15T17:00', type: 'work', color: '#4ECDC4' },
-          { id: 33, title: '마케팅 자료 제작', start: '2023-06-17T09:00', end: '2023-06-17T12:00', type: 'work', color: '#4ECDC4' }
-        ]},
-        { id: 10, name: '오사원', position: '사원', department: '마케팅부', team: '디지털마케팅팀', schedules: [
-          { id: 34, title: '데이터 분석', start: '2023-06-15T09:00', end: '2023-06-15T12:00', type: 'work', color: '#4ECDC4' },
-          { id: 35, title: '광고 소재 제작', start: '2023-06-15T14:00', end: '2023-06-15T16:00', type: 'work', color: '#4ECDC4' },
-          { id: 36, title: '성과 보고서 작성', start: '2023-06-16T13:00', end: '2023-06-16T15:00', type: 'other', color: '#45B7D1' }
-        ]}
-      ],
+      teamMembers: [], // DB에서 부서별로 데이터를 불러올 예정
       selectedMember: null,
       showExpandedView: false,
       expandedMember: null,
       activeTab: 'clock',
       selectedSchedule: null,
+      selectedDate: null, // 선택된 날짜 추가
       memberSelectedDates: {}, // 구성원별 선택된 날짜 관리
       currentYear: 2025,
       currentMonth: 6, // 7월 (0-based index)
@@ -524,144 +375,112 @@ export default {
           endDate: '2025-07-25',
           color: '#FF6B6B'
         }
-      ]
+      ],
+      // 빠른 미팅 요청 관련
+      showQuickModal: false,
+      selectedTimeSlot: null,
+      quickMeeting: {
+        title: '',
+        type: 'meeting'
+      },
+      // 일정 수정 관련
+      showEditModal: false,
+      editingSchedule: {
+        id: null,
+        title: '',
+        type: 'meeting',
+        hour: 0
+      },
+      // 드래그 투 셀렉트 관련
+      isDragging: false,
+      dragStartAngle: null,
+      dragCurrentAngle: null,
+      selectedTimeRange: {
+        start: null,
+        end: null
+      },
+      // API 엔드포인트
+      API_ENDPOINTS: {
+        USERS_ALL: '/api/schedule-sharing/users/all',
+        USERS_BY_DEPARTMENT: '/api/schedule-sharing/users/department',
+        SCHEDULES_BY_USER: '/api/schedules'
+      },
+      // 로딩 상태
+      isLoadingTeamMembers: false,
+      teamMembersError: null,
     };
   },
-  computed: {
-    calendarDays() {
-      const days = [];
-      const firstDay = new Date(this.currentYear, this.currentMonth, 1);
-      const lastDay = new Date(this.currentYear, this.currentMonth + 1, 0);
-      
-      // 이전 달의 마지막 날짜들
-      const prevMonthLastDate = new Date(this.currentYear, this.currentMonth, 0).getDate();
-      const firstDayOfWeek = firstDay.getDay();
-      
-      for (let i = firstDayOfWeek - 1; i >= 0; i--) {
-        const prevMonthYear = this.currentMonth === 0 ? this.currentYear - 1 : this.currentYear;
-        const prevMonth = this.currentMonth === 0 ? 11 : this.currentMonth - 1;
-        const day = prevMonthLastDate - i;
-        days.push({
-          date: `${prevMonthYear}-${String(prevMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
-          dayNumber: day,
-          isCurrentMonth: false
-        });
-      }
-      
-      // 현재 달의 날짜들
-      for (let i = 1; i <= lastDay.getDate(); i++) {
-        days.push({
-          date: `${this.currentYear}-${String(this.currentMonth + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`,
-          dayNumber: i,
-          isCurrentMonth: true
-        });
-      }
-      
-      // 다음 달의 시작 날짜들
-      const lastDayOfWeek = lastDay.getDay();
-      for (let i = 1; i < 7 - lastDayOfWeek; i++) {
-        const nextMonthYear = this.currentMonth === 11 ? this.currentYear + 1 : this.currentYear;
-        const nextMonth = this.currentMonth === 11 ? 0 : this.currentMonth + 1;
-        days.push({
-          date: `${nextMonthYear}-${String(nextMonth + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`,
-          dayNumber: i,
-          isCurrentMonth: false
-        });
-      }
-      
-      return days;
-    }
-  },
   methods: {
-    // 로그인된 사용자 정보 로드
+    // 드래그 관련 메서드들 (drag.js에서 import)
+    handleDragStart(event, memberId) {
+      dragStartHandler(event, memberId, this);
+    },
+    handleDragEnd() {
+      dragEndHandler(this);
+    },
+    handleDragOver(event) {
+      dragOverHandler(event);
+    },
+    handleDrop(event) {
+      nodeDropHandler(event, this.draggedMember, (memberId, left, top) => {
+        updateNodePositionHandler(memberId, left, top, this);
+      });
+    },
+
+    // 로그인된 사용자 정보 로드 (load.js에서 import)
     async loadMyProfile() {
-      try {
-        const userStr = localStorage.getItem('user');
-        if (!userStr) {
-          console.error('로그인 정보가 없습니다');
-          return;
-        }
-
-        // 현재 로그인한 사용자 정보 가져오기
-        const userResponse = await api.get('/api/user/profile');
-        
-        if (userResponse.data.success && userResponse.data.user) {
-          const user = userResponse.data.user;
-          
-          // 사용자 일정 가져오기
-          let schedules = [];
-          try {
-            const schedulesResponse = await api.get(`/api/schedules?user_id=${user.id}`);
-            if (schedulesResponse.data && Array.isArray(schedulesResponse.data)) {
-              schedules = schedulesResponse.data.map(schedule => {
-                const scheduleType = this.getScheduleType(schedule.title);
-                return {
-                  id: schedule.schedule_id,
-                  title: schedule.title,
-                  start: schedule.start_time,
-                  end: schedule.end_time,
-                  color: schedule.color || this.getScheduleColorByType(scheduleType),
-                  type: scheduleType
-                };
-              });
-            }
-          } catch (scheduleError) {
-            console.error('일정 로드 오류:', scheduleError);
-          }
-          
-          this.myProfile = {
-            id: 0, // 본인 노드는 항상 id: 0
-            name: user.name,
-            position: this.getPositionFromRole(user.role),
-            department: user.department,
-            team: '', // 팀 정보가 없으면 빈 문자열
-            schedules: schedules
-          };
-        }
-      } catch (error) {
-        console.error('사용자 정보 로드 오류:', error);
-        this.myProfile.name = '사용자 정보 로드 실패';
-      }
+      await loadMyProfileHandler(this, getScheduleTypeHandler, getScheduleColorByTypeHandler, getPositionFromRoleHandler);
     },
-
-    // 역할(role)에서 직급 추출
+    // 부서별 팀원 데이터 로드 (load.js에서 import)
+    async loadTeamMembers() {
+      await loadTeamMembersHandler(this, getScheduleColorByTypeHandler, getScheduleTypeHandler);
+    },
+    // 폴백 데이터 로드 (API 실패 시 사용) (load.js에서 import)
+    loadFallbackTeamMembers() {
+      loadFallbackTeamMembersHandler(this);
+    },
+    // 역할(role)에서 직급 추출 (load.js에서 import)
     getPositionFromRole(role) {
-      const roleMap = {
-        'admin': '관리자',
-        'manager': '부장',
-        'team_leader': '팀장',
-        'senior': '과장',
-        'junior': '대리',
-        'intern': '사원'
-      };
-      return roleMap[role] || '사원';
+      return getPositionFromRoleHandler(role);
+    },
+    // 부서별 사용자 조회 (필요시) (load.js에서 import)
+    async loadUsersByDepartment(department) {
+      return await loadUsersByDepartmentHandler(department);
+    },
+    // 특정 사용자의 일정 조회 (필요시) (load.js에서 import)
+    async loadUserSchedules(userId) {
+      return await loadUserSchedulesHandler(userId, this, getScheduleColorByTypeHandler, getScheduleTypeHandler);
     },
 
-    // 일정 제목으로 타입 추정
+    // 일정 제목으로 타입 추정 (Edit_schedules.js에서 import)
     getScheduleType(title) {
-      const titleLower = title.toLowerCase();
-      if (titleLower.includes('회의') || titleLower.includes('미팅') || titleLower.includes('meeting')) {
-        return 'meeting';
-      } else if (titleLower.includes('개발') || titleLower.includes('작업') || titleLower.includes('업무') || titleLower.includes('work')) {
-        return 'work';
-      } else {
-        return 'other';
-      }
+      return getScheduleTypeHandler(title);
+    },
+    // 일정 유형에 따라 색상 자동 할당 (Edit_schedules.js에서 import)
+    getScheduleColorByType(type) {
+      return getScheduleColorByTypeHandler(type, this);
+    },
+    // 일정 수정 관련 메서드들 (Edit_schedules.js에서 import)
+    editScheduleRequest(schedule) {
+      editScheduleRequestHandler(schedule, this);
+    },
+    closeEditModal() {
+      closeEditModalHandler(this);
+    },
+    updateScheduleRequest() {
+      updateScheduleRequestHandler(this);
+    },
+    deleteScheduleRequest(schedule) {
+      deleteScheduleRequestHandler(schedule, this);
+    },
+    isMySchedule(schedule) {
+      return isMyScheduleHandler(schedule, this);
+    },
+    editSchedule() {
+      if (!this.selectedSchedule) return;
+      editScheduleHandler(this);
     },
 
-    // 일정 유형에 따라 색상 자동 할당
-    getScheduleColorByType(type) {
-      switch(type) {
-        case 'meeting':
-          return this.scheduleColors.meeting;
-        case 'work':
-          return this.scheduleColors.work;
-        case 'other':
-          return this.scheduleColors.other;
-        default:
-          return this.scheduleColors.other;
-      }
-    },
     // 본인 노드 위치 계산 메서드 추가
     getMyNodePosition() {
       // 개발부 네모 위쪽에 고정 위치
@@ -680,11 +499,7 @@ export default {
       };
     },
     getNodePosition(index) {
-      // 저장된 위치가 있으면 사용
-      if (this.nodePositions[this.teamMembers[index].id]) {
-        return this.nodePositions[this.teamMembers[index].id];
-      }
-      
+      // 항상 초기 위치 계산 (nodePositions 무시)
       // 부서별로 그룹화하여 초기 위치 설정
       const member = this.teamMembers[index];
       const department = member.department;
@@ -720,46 +535,52 @@ export default {
       
       return { left: `${x}px`, top: `${y}px` };
     },
+
+    // 멤버 선택 및 모달 관련
     selectMember(memberId) {
+      console.log('🚀 노드 클릭됨! memberId:', memberId);
+      
+      // 기존 로직
       this.selectedMember = memberId;
+      
+      // 모달도 함께 열기 (기본적으로 시계 뷰로)
+      this.expandMemberSchedule(memberId);
+      
+      // API 호출
+      loadUserSchedulesHandler(memberId, this, getScheduleColorByTypeHandler, getScheduleTypeHandler)
+        .then(schedules => {
+          console.log('✅ API 응답 성공:', schedules);
+          
+          const member = this.teamMembers.find(m => m.id === memberId);
+          if (member) {
+            member.schedules = schedules;
+            console.log(`🎉 ${member.name}의 일정 데이터 로드 완료`);
+          }
+        })
+        .catch(error => {
+          console.error('❌ 사용자 일정 로드 오류:', error);
+        });
     },
     expandMemberSchedule(memberId) {
-      // 본인 노드(id: 0)인 경우 MySchedule 모달 표시
-      if (memberId === 0) {
-        this.showMyScheduleModal = true;
-        return;
-      }
-      
-      // 다른 팀원들인 경우 기존 확대 모달 표시
-      this.expandedMember = this.teamMembers.find(m => m.id === memberId);
-      this.showExpandedView = true;
-      this.activeTab = 'clock';
-      // 모달 열 때 오늘 날짜로 초기화
-      this.memberSelectedDates[memberId] = this.today;
+      expandMemberScheduleHandler(memberId, this);
     },
-
     closeMyScheduleModal() {
-      this.showMyScheduleModal = false;
+      closeMyScheduleModalHandler(this);
     },
-
-
     closeExpandedView() {
-      this.showExpandedView = false;
-      this.expandedMember = null;
-      this.selectedSchedule = null;
-      // 모달 닫을 때 선택된 날짜 초기화
-      if (this.expandedMember) {
-        this.memberSelectedDates[this.expandedMember.id] = null;
-      }
+      closeExpandedViewHandler(this);
     },
     showClockView(memberId) {
-      this.expandMemberSchedule(memberId);
-      this.activeTab = 'clock';
+      showClockViewHandler(memberId, this);
     },
     showCalendarView(memberId) {
-      this.expandMemberSchedule(memberId);
-      this.activeTab = 'calendar';
+      showCalendarViewHandler(memberId, this);
     },
+    openUserSchedule(user) {
+      openUserScheduleModalHandler(user, this);
+    },
+
+    // 일정 관련 메서드
     getTimeSchedulePreview(member) {
       const today = new Date().toISOString().split('T')[0];
       const todaySchedules = member.schedules.filter(s => s.start.startsWith(today));
@@ -817,27 +638,11 @@ export default {
       //   end: '2023-06-15T11:00',
       //   type: 'meeting' // 또는 'work', 'other'
       // };
-      // newSchedule.color = this.getScheduleColorByType(newSchedule.type);
+      // newSchedule.color = getScheduleColorByTypeHandler(newSchedule.type, this);
       // this.expandedMember.schedules.push(newSchedule);
     },
-    editSchedule() {
-      if (!this.selectedSchedule) return;
-      // 실제 구현에서는 일정 수정 모달 표시
-      alert('일정 수정 기능은 아직 구현되지 않았습니다.');
-      // 일정 수정 시 유형에 따라 색상 자동 설정 예시
-      // this.selectedSchedule.color = this.getScheduleColorByType(this.selectedSchedule.type);
-    },
-    dragStart(event, memberId) {
-      this.draggedMember = memberId;
-      event.dataTransfer.setData('text/plain', memberId);
-      event.dataTransfer.effectAllowed = 'move';
-    },
-    dragEnd() {
-      this.draggedMember = null;
-    },
-    updateNodePosition(memberId, left, top) {
-      this.nodePositions[memberId] = { left: `${left}px`, top: `${top}px` };
-    },
+
+    // 시계 관련 메서드
     getHourMarkStyle(hour) {
       const angle = (hour / 12) * 2 * Math.PI - Math.PI / 2;
       const x = Math.cos(angle) * 18;
@@ -847,48 +652,6 @@ export default {
         top: `${y + 20}px`
       };
     },
-    // 오늘의 일정만 가져오기
-    getTodaySchedules(member) {
-      // 본인인 경우 실제 오늘 날짜 사용, 다른 사람은 하드코딩된 날짜 사용
-      let today;
-      if (member.id === 0) {
-        // 본인 노드인 경우 실제 오늘 날짜
-        today = new Date().toISOString().split('T')[0];
-      } else {
-        // 다른 팀원들은 예시 데이터를 위해 하드코딩된 날짜 사용
-        today = this.today;
-      }
-      
-      const schedules = member.schedules.filter(s => {
-        if (member.id === 0) {
-          // 시간대 문제를 해결하기 위해 로컬 날짜로 비교
-          const scheduleDate = new Date(s.start);
-          const localDateString = `${scheduleDate.getFullYear()}-${String(scheduleDate.getMonth() + 1).padStart(2, '0')}-${String(scheduleDate.getDate()).padStart(2, '0')}`;
-          return localDateString === today;
-        } else {
-          return s.start.startsWith(today);
-        }
-      });
-      
-      // 본인 노드의 오늘 일정 디버깅
-      if (member.id === 0) {
-        console.log(`[본인 노드] 오늘 날짜: ${today}`);
-        console.log(`[본인 노드] 전체 일정 수: ${member.schedules.length}`);
-        console.log(`[본인 노드] 전체 일정 목록:`);
-        member.schedules.forEach(s => {
-          const scheduleDate = new Date(s.start);
-          const localDateString = `${scheduleDate.getFullYear()}-${String(scheduleDate.getMonth() + 1).padStart(2, '0')}-${String(scheduleDate.getDate()).padStart(2, '0')}`;
-          console.log(`  - ${s.title}: ${s.start} (로컬날짜: ${localDateString}), 색상: ${s.color}`);
-        });
-        console.log(`[본인 노드] 오늘 일정:`, schedules);
-        schedules.forEach(s => {
-          console.log(`  - ${s.title}: ${s.start} ~ ${s.end}, 색상: ${s.color}`);
-        });
-      }
-      
-      return schedules;
-    },
-
     getScheduleSegmentStyle(schedule) {
       try {
         console.log(`[미니시계] 일정 스타일 생성: ${schedule.title}, 색상: ${schedule.color}`);
@@ -954,7 +717,6 @@ export default {
         };
       }
     },
-    
     getExpandedScheduleStyle(schedule) {
       try {
         // 시간 파싱 - Date 객체 사용
@@ -1015,20 +777,138 @@ export default {
         };
       }
     },
-    
+    getHourNumberStyle(hour) {
+      // 시계 숫자 위치 계산 (12시는 위쪽, 시계 방향으로 회전)
+      const angle = ((hour % 12) / 12) * 2 * Math.PI - Math.PI / 2;
+      const radius = 34; // 반지름을 키워서 80px 시계에 맞게 조정
+      const centerX = 38; // 시계 중심 X 좌표 (80px 시계의 중심)
+      const centerY = 38; // 시계 중심 Y 좌표 (80px 시계의 중심)
+      
+      const x = Math.cos(angle) * radius + centerX;
+      const y = Math.sin(angle) * radius + centerY;
+      
+      return {
+        position: 'absolute',
+        left: `${x}px`,
+        top: `${y}px`,
+        transform: 'translate(-50%, -50%)',
+        fontSize: '9px',
+        fontWeight: 'bold',
+        zIndex: 20,
+        color: '#333',
+        textShadow: '0 0 2px white'
+      };
+    },
+    getExpandedHourNumberStyle(hour) {
+      // 확대된 시계 숫자 위치 계산 (500px 시계에 맞게 조정)
+      const angle = ((hour % 12) / 12) * 2 * Math.PI - Math.PI / 2;
+      const radius = 225; // 반지름을 조정하여 모서리쪽에 배치
+      const centerX = 250; // 시계 중심 X 좌표 (500px 시계의 중심은 250)
+      const centerY = 250; // 시계 중심 Y 좌표 (500px 시계의 중심은 250)
+      
+      const x = Math.cos(angle) * radius + centerX;
+      const y = Math.sin(angle) * radius + centerY;
+      
+      return {
+        position: 'absolute',
+        left: `${x}px`,
+        top: `${y}px`,
+        transform: 'translate(-50%, -50%)',
+        fontSize: '28px',
+        fontWeight: 'bold',
+        zIndex: 20,
+        color: '#333',
+        textShadow: '0 0 3px white'
+      };
+    },
+    getTimeSlotStyle(hour) {
+      const angle = (hour / 12) * 2 * Math.PI - Math.PI / 2;
+      const radius = 225; // 시간 숫자와 동일한 반지름
+      const centerX = 250; // 시계 중심 X 좌표
+      const centerY = 250; // 시계 중심 Y 좌표
+      
+      const x = Math.cos(angle) * radius + centerX;
+      const y = Math.sin(angle) * radius + centerY;
+      
+      return {
+        position: 'absolute',
+        left: `${x}px`,
+        top: `${y}px`,
+        transform: 'translate(-50%, -50%)'
+      };
+    },
+    getEmptyTimeSlotStyle(slot) {
+      const hour = slot.hour > 12 ? slot.hour - 12 : slot.hour;
+      const angle = (hour / 12) * 2 * Math.PI - Math.PI / 2;
+      const radius = 35; // 일정보다 안쪽에 위치
+      const x = Math.cos(angle) * radius;
+      const y = Math.sin(angle) * radius;
+      
+      return {
+        position: 'absolute',
+        left: `${x + 50}px`,
+        top: `${y + 50}px`,
+        transform: 'translate(-50%, -50%)'
+      };
+    },
+
+    // 오늘의 일정 관련
+    getTodaySchedules(member) {
+      // member나 schedules가 null/undefined인 경우 빈 배열 반환
+      if (!member || !member.schedules || !Array.isArray(member.schedules)) {
+        return [];
+      }
+      
+      // 본인인 경우 실제 오늘 날짜 사용, 다른 사람은 하드코딩된 날짜 사용
+      let today;
+      // if (member.id === 0) {
+        // 본인 노드인 경우 실제 오늘 날짜
+        today = new Date().toISOString().split('T')[0];
+      // } else {
+      //   // 다른 팀원들은 예시 데이터를 위해 하드코딩된 날짜 사용
+      //   today = this.today;
+      // }
+      
+      const schedules = member.schedules.filter(s => {
+        // if (member.id === 0) {
+          // 시간대 문제를 해결하기 위해 로컬 날짜로 비교
+          const scheduleDate = new Date(s.start);
+          const localDateString = `${scheduleDate.getFullYear()}-${String(scheduleDate.getMonth() + 1).padStart(2, '0')}-${String(scheduleDate.getDate()).padStart(2, '0')}`;
+          return localDateString === today;
+        // } else {
+        //   return s.start.startsWith(today);
+        // }
+      });
+      
+      return schedules;
+    },
+    getSelectedDateSchedules() {
+      if (!this.expandedMember) return [];
+      
+      const memberId = this.expandedMember.id;
+      const targetDate = this.memberSelectedDates[memberId] || this.today;
+      
+      return this.expandedMember.schedules.filter(s => s.start.startsWith(targetDate));
+    },
+    getCurrentSelectedDate() {
+      if (!this.expandedMember) return this.today;
+      return this.memberSelectedDates[this.expandedMember.id] || this.today;
+    },
+
+    // 달력 관련 메서드
     getMiniCalendarDaySchedule(member, dayIndex) {
       // 본인 노드인 경우 현재 실제 날짜 기준, 다른 사람은 하드코딩된 달력 기준
       let year, month;
-      if (member.id === 0) {
+      // if (member.id === 0) {
         // 본인은 현재 실제 날짜 기준
         const now = new Date();
         year = now.getFullYear();
         month = now.getMonth();
-      } else {
-        // 다른 팀원들은 하드코딩된 달력 기준
-        year = this.currentYear;
-        month = this.currentMonth;
-      }
+      // // } else {
+      //   // 다른 팀원들은 하드코딩된 달력 기준
+      //   year = this.currentYear;
+      //   month = this.currentMonth;
+      // }
       
       const currentDate = new Date(year, month, 1);
       const firstDayOfMonth = currentDate.getDay();
@@ -1040,16 +920,79 @@ export default {
       const dateString = day.toISOString().split('T')[0];
       
       const scheduleForDay = member.schedules.find(s => {
-        if (member.id === 0) {
+        // if (member.id === 0) {
           // 시간대 문제를 해결하기 위해 로컬 날짜로 비교
           const scheduleDate = new Date(s.start);
           const localDateString = `${scheduleDate.getFullYear()}-${String(scheduleDate.getMonth() + 1).padStart(2, '0')}-${String(scheduleDate.getDate()).padStart(2, '0')}`;
           return localDateString === dateString;
-        } else {
-          return s.start.startsWith(dateString);
-        }
+        // } else {
+        //   return s.start.startsWith(dateString);
+        // }
       });
       return scheduleForDay || null;
+    },
+    getMiniCalendarDayNumber(index) {
+      // 나의일정수정에서 선택된 날짜를 기준으로 하거나, 없으면 현재 월 기준
+      const selectedDate = this.getSelectedDateFromSchedule();
+      const currentYear = selectedDate.getFullYear();
+      const currentMonth = selectedDate.getMonth();
+      
+      // index는 1부터 시작하므로 0부터 시작하도록 조정
+      const zeroBasedIndex = index - 1;
+      
+      const currentDate = new Date(currentYear, currentMonth, 1);
+      const firstDayOfMonth = currentDate.getDay();
+      const adjustedIndex = zeroBasedIndex - firstDayOfMonth;
+      
+      if (adjustedIndex < 0) {
+        // 이전 달의 날짜
+        const prevMonthLastDate = new Date(currentYear, currentMonth, 0).getDate();
+        return prevMonthLastDate + adjustedIndex + 1;
+      } else {
+        // 현재 달의 날짜 (다음 달로 넘어가는 경우도 현재 달 기준으로 계산)
+        const currentMonthLastDate = new Date(currentYear, currentMonth + 1, 0).getDate();
+        if (adjustedIndex + 1 <= currentMonthLastDate) {
+          return adjustedIndex + 1;
+        } else {
+          // 다음 달의 날짜
+          return adjustedIndex + 1 - currentMonthLastDate;
+        }
+      }
+    },
+    getMiniCalendarDate(index) {
+      // 나의일정수정에서 선택된 날짜를 기준으로 하거나, 없으면 현재 월 기준
+      const selectedDate = this.getSelectedDateFromSchedule();
+      const currentYear = selectedDate.getFullYear();
+      const currentMonth = selectedDate.getMonth();
+      
+      // index는 1부터 시작하므로 0부터 시작하도록 조정
+      const zeroBasedIndex = index - 1;
+      
+      const currentDate = new Date(currentYear, currentMonth, 1);
+      const firstDayOfMonth = currentDate.getDay();
+      const adjustedIndex = zeroBasedIndex - firstDayOfMonth;
+      
+      if (adjustedIndex < 0) {
+        // 이전 달의 날짜
+        const prevMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+        const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+        const prevMonthLastDate = new Date(currentYear, currentMonth, 0).getDate();
+        const day = prevMonthLastDate + adjustedIndex + 1;
+        return `${prevMonthYear}-${String(prevMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      } else {
+        // 현재 달의 날짜 (다음 달로 넘어가는 경우도 처리)
+        const currentMonthLastDate = new Date(currentYear, currentMonth + 1, 0).getDate();
+        if (adjustedIndex + 1 <= currentMonthLastDate) {
+          const day = adjustedIndex + 1;
+          return `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        } else {
+          // 다음 달의 날짜
+          const nextMonthYear = currentMonth === 11 ? currentYear + 1 : currentYear;
+          const nextMonth = currentMonth === 11 ? 0 : currentMonth + 1;
+          const day = adjustedIndex + 1 - currentMonthLastDate;
+          return `${nextMonthYear}-${String(nextMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        }
+      }
     },
     
     formatTime(dateTimeString) {
@@ -1080,6 +1023,9 @@ export default {
     selectDate(dateString) {
       if (this.expandedMember) {
         this.memberSelectedDates[this.expandedMember.id] = dateString;
+        // selectedDate도 업데이트
+        this.selectedDate = dateString;
+        
         // 선택된 날짜의 일정이 있으면 첫 번째 일정을 선택
         const selectedDateSchedules = this.getDaySchedules(dateString);
         if (selectedDateSchedules.length > 0) {
@@ -1117,81 +1063,6 @@ export default {
       }
       
       return weeks;
-    },
-    
-    getHourNumberStyle(hour) {
-      // 시계 숫자 위치 계산 (12시는 위쪽, 시계 방향으로 회전)
-      const angle = ((hour % 12) / 12) * 2 * Math.PI - Math.PI / 2;
-      const radius = 34; // 반지름을 키워서 80px 시계에 맞게 조정
-      const centerX = 38; // 시계 중심 X 좌표 (80px 시계의 중심)
-      const centerY = 38; // 시계 중심 Y 좌표 (80px 시계의 중심)
-      
-      const x = Math.cos(angle) * radius + centerX;
-      const y = Math.sin(angle) * radius + centerY;
-      
-      return {
-        position: 'absolute',
-        left: `${x}px`,
-        top: `${y}px`,
-        transform: 'translate(-50%, -50%)',
-        fontSize: '9px',
-        fontWeight: 'bold',
-        zIndex: 20,
-        color: '#333',
-        textShadow: '0 0 2px white'
-      };
-    },
-    
-    getExpandedHourNumberStyle(hour) {
-      // 확대된 시계 숫자 위치 계산 (500px 시계에 맞게 조정)
-      const angle = ((hour % 12) / 12) * 2 * Math.PI - Math.PI / 2;
-      const radius = 225; // 반지름을 조정하여 모서리쪽에 배치
-      const centerX = 250; // 시계 중심 X 좌표 (500px 시계의 중심은 250)
-      const centerY = 250; // 시계 중심 Y 좌표 (500px 시계의 중심은 250)
-      
-      const x = Math.cos(angle) * radius + centerX;
-      const y = Math.sin(angle) * radius + centerY;
-      
-      return {
-        position: 'absolute',
-        left: `${x}px`,
-        top: `${y}px`,
-        transform: 'translate(-50%, -50%)',
-        fontSize: '28px',
-        fontWeight: 'bold',
-        zIndex: 20,
-        color: '#333',
-        textShadow: '0 0 3px white'
-      };
-    },
-    
-    getMiniCalendarDayNumber(index) {
-      // 나의일정수정에서 선택된 날짜를 기준으로 하거나, 없으면 현재 월 기준
-      const selectedDate = this.getSelectedDateFromSchedule();
-      const currentYear = selectedDate.getFullYear();
-      const currentMonth = selectedDate.getMonth();
-      
-      // index는 1부터 시작하므로 0부터 시작하도록 조정
-      const zeroBasedIndex = index - 1;
-      
-      const currentDate = new Date(currentYear, currentMonth, 1);
-      const firstDayOfMonth = currentDate.getDay();
-      const adjustedIndex = zeroBasedIndex - firstDayOfMonth;
-      
-      if (adjustedIndex < 0) {
-        // 이전 달의 날짜
-        const prevMonthLastDate = new Date(currentYear, currentMonth, 0).getDate();
-        return prevMonthLastDate + adjustedIndex + 1;
-      } else {
-        // 현재 달의 날짜 (다음 달로 넘어가는 경우도 현재 달 기준으로 계산)
-        const currentMonthLastDate = new Date(currentYear, currentMonth + 1, 0).getDate();
-        if (adjustedIndex + 1 <= currentMonthLastDate) {
-          return adjustedIndex + 1;
-        } else {
-          // 다음 달의 날짜
-          return adjustedIndex + 1 - currentMonthLastDate;
-        }
-      }
     },
     
     // 나의일정수정에서 선택된 날짜 가져오기 (localStorage 활용)
@@ -1239,43 +1110,6 @@ export default {
       const day = date.getDate();
       return `${month}월 ${day}일`;
     },
-    
-    // 미니 달력의 날짜 인덱스로부터 실제 날짜 계산
-    getMiniCalendarDate(index) {
-      // 나의일정수정에서 선택된 날짜를 기준으로 하거나, 없으면 현재 월 기준
-      const selectedDate = this.getSelectedDateFromSchedule();
-      const currentYear = selectedDate.getFullYear();
-      const currentMonth = selectedDate.getMonth();
-      
-      // index는 1부터 시작하므로 0부터 시작하도록 조정
-      const zeroBasedIndex = index - 1;
-      
-      const currentDate = new Date(currentYear, currentMonth, 1);
-      const firstDayOfMonth = currentDate.getDay();
-      const adjustedIndex = zeroBasedIndex - firstDayOfMonth;
-      
-      if (adjustedIndex < 0) {
-        // 이전 달의 날짜
-        const prevMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
-        const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
-        const prevMonthLastDate = new Date(currentYear, currentMonth, 0).getDate();
-        const day = prevMonthLastDate + adjustedIndex + 1;
-        return `${prevMonthYear}-${String(prevMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      } else {
-        // 현재 달의 날짜 (다음 달로 넘어가는 경우도 처리)
-        const currentMonthLastDate = new Date(currentYear, currentMonth + 1, 0).getDate();
-        if (adjustedIndex + 1 <= currentMonthLastDate) {
-          const day = adjustedIndex + 1;
-          return `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        } else {
-          // 다음 달의 날짜
-          const nextMonthYear = currentMonth === 11 ? currentYear + 1 : currentYear;
-          const nextMonth = currentMonth === 11 ? 0 : currentMonth + 1;
-          const day = adjustedIndex + 1 - currentMonthLastDate;
-          return `${nextMonthYear}-${String(nextMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        }
-      }
-    },
 
     // 선택된 날짜 표시 포맷 메서드 추가
     formatSelectedDate(dateString) {
@@ -1287,22 +1121,6 @@ export default {
       const weekday = weekdays[date.getDay()];
       return `${year}년 ${month}월 ${day}일 ${weekday}요일`;
     },
-
-    // 선택된 날짜의 일정만 가져오는 메서드 추가
-    getSelectedDateSchedules() {
-      if (!this.expandedMember) return [];
-      
-      const memberId = this.expandedMember.id;
-      const targetDate = this.memberSelectedDates[memberId] || this.today;
-      
-      return this.expandedMember.schedules.filter(s => s.start.startsWith(targetDate));
-    },
-    
-    // 현재 선택된 날짜 가져오기
-    getCurrentSelectedDate() {
-      if (!this.expandedMember) return this.today;
-      return this.memberSelectedDates[this.expandedMember.id] || this.today;
-    },
     
     // 페이지 포커스 리스너 설정
     setupPageFocusListener() {
@@ -1311,40 +1129,312 @@ export default {
         this.$forceUpdate();
       };
       window.addEventListener('focus', this.pageFocusListener);
-    }
-  },
-  async mounted() {
-    // 로그인된 사용자 정보 로드
-    await this.loadMyProfile();
+    },
     
-    // 드래그 앤 드롭 이벤트 리스너 설정
-    this.$nextTick(() => {
-      // DOM에서 직접 요소를 찾아서 이벤트 리스너 설정
-      const graphViewElement = document.querySelector('.graph-view');
+    // 빈 시간 슬롯 가져오기 (시간 제한 없이 모든 빈 시간)
+    getEmptyTimeSlots() {
+      if (!this.expandedMember) return [];
       
-      if (graphViewElement) {
-        graphViewElement.addEventListener('dragover', (e) => {
-          e.preventDefault();
+      const emptySlots = [];
+      const existingSchedules = this.getSelectedDateSchedules();
+      
+      // 0시부터 23시까지 모든 시간 체크
+      for (let hour = 0; hour < 24; hour++) {
+        const hasSchedule = existingSchedules.some(schedule => {
+          const startHour = new Date(schedule.start).getHours();
+          const endHour = new Date(schedule.end).getHours();
+          return hour >= startHour && hour < endHour;
         });
         
-        graphViewElement.addEventListener('drop', (e) => {
-          e.preventDefault();
-          if (this.draggedMember) {
-            // 드롭된 위치로 노드 이동
-            const rect = graphViewElement.getBoundingClientRect();
-            const left = e.clientX - rect.left;
-            const top = e.clientY - rect.top;
-            this.updateNodePosition(this.draggedMember, left, top);
-          }
-        });
-      } else {
-        console.warn('GraphView 요소를 찾을 수 없습니다.');
+        if (!hasSchedule) {
+          emptySlots.push({ hour });
+        }
       }
+      
+      return emptySlots;
+    },
+    
+    // 미팅 요청 추가
+    addMeetingRequest(timeSlot) {
+      openQuickMeetingModalHandler(timeSlot, this);
+    },
+    
+    // 빠른 모달 닫기
+    closeQuickModal() {
+      closeQuickModalHandler(this);
+    },
+    
+    // 빠른 미팅 추가
+    async addQuickMeeting() {
+      try {
+        const startHour = this.selectedTimeSlot.hour;
+        const endHour = this.selectedTimeSlot.endHour || (this.selectedTimeSlot.hour + 1);
+        
+        const startTime = `${startHour.toString().padStart(2, '0')}:00`;
+        const endTime = `${endHour.toString().padStart(2, '0')}:00`;
+        
+        const meetingRequest = {
+          title: `[요청] ${this.quickMeeting.title}`,
+          start: `${this.getCurrentSelectedDate()}T${startTime}`,
+          end: `${this.getCurrentSelectedDate()}T${endTime}`,
+          type: this.quickMeeting.type,
+          color: '#4CAF50', // 요청 일정은 초록색으로 고정
+          isRequest: true, // 요청 플래그
+          requestedBy: this.myProfile.name // 요청자
+        };
+        
+        // 해당 멤버의 일정에 바로 추가 (실제로는 API 호출)
+        this.expandedMember.schedules.push({
+          ...meetingRequest,
+          id: Date.now() // 임시 ID
+        });
+        
+        alert(`${this.expandedMember.name}님께 미팅 요청을 보냈습니다!`);
+        this.closeQuickModal();
+        
+      } catch (error) {
+        console.error('미팅 요청 실패:', error);
+        alert('미팅 요청에 실패했습니다.');
+      }
+    },
+    
+
+    
+    // 드래그 투 셀렉트 관련 메서드들
+    onDragStart(event) {
+      if (event.target.closest('.schedule-segment') || event.target.closest('.schedule-tooltip')) return;
+      
+      this.isDragging = true;
+      const angle = this.getAngleFromEvent(event);
+      this.dragStartAngle = angle;
+      this.dragCurrentAngle = angle;
+      this.selectedTimeRange = { start: null, end: null };
+    },
+    
+    onDragMove(event) {
+      if (!this.isDragging) return;
+      
+      const angle = this.getAngleFromEvent(event);
+      this.dragCurrentAngle = angle;
+    },
+    
+    onDragEnd() {
+      if (!this.isDragging) return;
+      
+      this.isDragging = false;
+      
+      // 드래그 범위 계산
+      const startHour = this.angleToHour(this.dragStartAngle);
+      const endHour = this.angleToHour(this.dragCurrentAngle);
+      
+      const minHour = Math.min(startHour, endHour);
+      const maxHour = Math.max(startHour, endHour);
+      
+      if (minHour !== maxHour) {
+        this.selectedTimeRange = {
+          start: minHour,
+          end: maxHour
+        };
+        this.openDragScheduleModal();
+      }
+      
+      this.dragStartAngle = null;
+      this.dragCurrentAngle = null;
+    },
+    
+    onClockFaceClick(event) {
+      if (this.isDragging) return;
+      
+      const angle = this.getAngleFromEvent(event);
+      const hour = this.angleToHour(angle);
+      
+      this.selectedTimeRange = {
+        start: hour,
+        end: hour + 1
+      };
+      this.openDragScheduleModal();
+    },
+    
+    getAngleFromEvent(event) {
+      // ExpandedClockFace 요소를 정확히 찾기
+      let clockFace = event.currentTarget;
+      
+      // 만약 currentTarget이 올바르지 않다면 closest로 찾기
+      if (!clockFace.classList || !clockFace.classList.contains('expanded-clock-face')) {
+        clockFace = event.target.closest('.expanded-clock-face') || event.currentTarget;
+      }
+      
+      const rect = clockFace.getBoundingClientRect();
+      
+      // 시계의 중심점 계산 (실제 시계 크기에 맞게)
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      
+      const x = event.clientX - centerX;
+      const y = event.clientY - centerY;
+      
+      console.log('좌표 계산:', {
+        clientX: event.clientX,
+        clientY: event.clientY,
+        rectLeft: rect.left,
+        rectTop: rect.top,
+        centerX: centerX,
+        centerY: centerY,
+        x: x,
+        y: y
+      });
+      
+      let angle = Math.atan2(y, x) * (180 / Math.PI);
+      angle = (angle + 90 + 360) % 360; // 12시 방향을 0도로
+      
+      return angle;
+    },
+    
+    angleToHour(angle) {
+      const hour = Math.round(angle / 30); // 30도마다 1시간
+      return hour === 0 ? 12 : hour;
+    },
+    
+    getTimeSlotSelected(hour) {
+      if (!this.selectedTimeRange.start || !this.selectedTimeRange.end) return false;
+      return hour >= this.selectedTimeRange.start && hour <= this.selectedTimeRange.end;
+    },
+    
+    getDragSelectionStyle() {
+      if (!this.isDragging || !this.dragStartAngle || !this.dragCurrentAngle) return {};
+      
+      const startAngle = Math.min(this.dragStartAngle, this.dragCurrentAngle);
+      const endAngle = Math.max(this.dragStartAngle, this.dragCurrentAngle);
+      const angleDiff = endAngle - startAngle;
+      
+      // 시간표 크기에 100% 정확히 맞춤 - 테두리까지 완벽하게
+      const centerX = 250; // 시계 중심 (500/2)
+      const centerY = 250; // 시계 중심 (500/2)
+      const radius = 250; // 시간표 전체 반지름 (500/2)
+      
+      // 디버깅용 로그
+      console.log('드래그 원 크기:', {
+        centerX,
+        centerY,
+        radius,
+        left: centerX - radius,
+        top: centerY - radius,
+        width: radius * 2,
+        height: radius * 2
+      });
+      
+      return {
+        position: 'absolute',
+        left: `${centerX - radius}px`,
+        top: `${centerY - radius}px`,
+        width: `${radius * 2}px`,
+        height: `${radius * 2}px`,
+        background: `conic-gradient(from ${startAngle}deg, transparent 0deg, rgba(76, 175, 80, 0.8) 0deg, rgba(76, 175, 80, 0.8) ${angleDiff}deg, transparent ${angleDiff}deg)`,
+        borderRadius: '50%',
+        pointerEvents: 'none',
+        zIndex: 5,
+        border: 'none',
+        boxShadow: '0 0 25px rgba(76, 175, 80, 0.6)'
+      };
+    },
+    
+    openDragScheduleModal() {
+      openDragScheduleModalHandler(this);
+    }
+  },
+  computed: {
+    calendarDays() {
+      const days = [];
+      const firstDay = new Date(this.currentYear, this.currentMonth, 1);
+      const lastDay = new Date(this.currentYear, this.currentMonth + 1, 0);
+      
+      // 이전 달의 마지막 날짜들
+      const prevMonthLastDate = new Date(this.currentYear, this.currentMonth, 0).getDate();
+      const firstDayOfWeek = firstDay.getDay();
+      
+      for (let i = firstDayOfWeek - 1; i >= 0; i--) {
+        const prevMonthYear = this.currentMonth === 0 ? this.currentYear - 1 : this.currentYear;
+        const prevMonth = this.currentMonth === 0 ? 11 : this.currentMonth - 1;
+        const day = prevMonthLastDate - i;
+        days.push({
+          date: `${prevMonthYear}-${String(prevMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
+          dayNumber: day,
+          isCurrentMonth: false
+        });
+      }
+      
+      // 현재 달의 날짜들
+      for (let i = 1; i <= lastDay.getDate(); i++) {
+        days.push({
+          date: `${this.currentYear}-${String(this.currentMonth + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`,
+          dayNumber: i,
+          isCurrentMonth: true
+        });
+      }
+      
+      // 다음 달의 시작 날짜들
+      const lastDayOfWeek = lastDay.getDay();
+      for (let i = 1; i < 7 - lastDayOfWeek; i++) {
+        const nextMonthYear = this.currentMonth === 11 ? this.currentYear + 1 : this.currentYear;
+        const nextMonth = this.currentMonth === 11 ? 0 : this.currentMonth + 1;
+        days.push({
+          date: `${nextMonthYear}-${String(nextMonth + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`,
+          dayNumber: i,
+          isCurrentMonth: false
+        });
+      }
+      
+      return days;
+    }
+  },
+  
+
+
+  async mounted() {
+    console.log('🚀 === ScheduleSharing 컴포넌트 마운트 시작 ===');
+    
+    // 로그인된 사용자 정보 로드
+    await this.loadMyProfile();
+    console.log('✅ 본인 프로필 로드 완료:', this.myProfile);
+    
+    // 팀원 데이터 로드
+    await this.loadTeamMembers();
+    console.log('✅ 팀원 데이터 로드 완료:', this.teamMembers);
+    console.log('📊 팀원 수:', this.teamMembers.length);
+    
+    // 각 팀원의 ID 확인
+    this.teamMembers.forEach((member, index) => {
+      console.log(`👤 팀원 ${index + 1}:`, {
+        id: member.id,
+        name: member.name,
+        role: member.role,
+        department: member.department
+      });
+    });
+    
+
+    
+    // selectedDate 초기화
+    this.selectedDate = this.today;
+    console.log('📅 selectedDate 초기화:', this.selectedDate);
+    
+    // MemberNode 요소들 확인
+    this.$nextTick(() => {
+      const memberNodes = document.querySelectorAll('[data-member-id]');
+      console.log('🔍 찾은 MemberNode 요소들:', memberNodes.length);
+      memberNodes.forEach((node, index) => {
+        console.log(`📍 MemberNode ${index + 1}:`, {
+          memberId: node.getAttribute('data-member-id'),
+          className: node.className
+        });
+      });
     });
     
     // localStorage 변경 감지를 위한 이벤트 리스너 (같은 탭에서는 동작하지 않으므로 다른 방법 사용)
     // 대신 페이지 포커스 시 미니달력을 다시 렌더링하도록 설정
     this.setupPageFocusListener();
+    
+    console.log('🏁 === ScheduleSharing 컴포넌트 마운트 완료 ===');
   },
   
   beforeUnmount() {

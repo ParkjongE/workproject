@@ -12,12 +12,12 @@ func CORS(next http.Handler) http.Handler {
 		origin := r.Header.Get("Origin")
 		log.Printf("CORS - 요청 Origin: %s", origin)
 
-		// 192.168.0.x:3000 대역 모두 허용
+		// 허용된 IP 대역
 		isAllowed := false
 		if origin == "http://localhost:3000" || origin == "http://127.0.0.1:3000" {
 			isAllowed = true
-		} else if strings.HasPrefix(origin, "http://192.168.0.") && strings.HasSuffix(origin, ":3000") {
-			// 192.168.0.1:3000 ~ 192.168.0.254:3000 모두 허용
+		} else if strings.HasPrefix(origin, "http://172.30.1.") && strings.HasSuffix(origin, ":3000") {
+			// 172.30.1.1:3000 ~ 172.30.1.254:3000 모두 허용
 			isAllowed = true
 		}
 

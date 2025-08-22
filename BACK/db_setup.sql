@@ -58,11 +58,10 @@ CREATE TABLE leave_requests (
 
 -- attendance_records 테이블 생성
 CREATE TABLE attendance_records (
-    record_id INT PRIMARY KEY AUTO_INCREMENT,
-    user_id INT NOT NULL,
+    record_id INT PRIMARY KEY AUTO_INCREMENT, 
     work_date DATE NOT NULL,
     check_in_time DATETIME,
-    check_out_time DATETIME,
+    check_out_time DATETIME, 
     status VARCHAR(20),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id),

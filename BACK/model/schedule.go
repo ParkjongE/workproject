@@ -10,9 +10,10 @@ type Schedule struct {
 	ProjectID   int    `json:"project_id"`
 	StartTime   string `json:"start_time"`
 	EndTime     string `json:"end_time"`
+	Type        string `json:"type"` // 추가
+	Color       string `json:"color"`
 	CreatedAt   string `json:"created_at"`
 	UpdatedAt   string `json:"updated_at"`
-	Color       string `json:"color"`
 }
 
 // ==================== Response 구조체들 ====================

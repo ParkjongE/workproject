@@ -8,6 +8,7 @@ import (
 	"BACK/service"
 	"log"
 	"net/http"
+	"strings"
 )
 
 func main() {
@@ -21,6 +22,7 @@ func main() {
 	scheduleRepo := repository.NewScheduleRepository(config.DB)
 	registerRepo := repository.NewRegisterRepository(config.DB)
 	leaveRepo := repository.NewLeaveRepository(config.DB)
+	scheduleSharingRepo := repository.NewScheduleSharingRepository(config.GetDB()) // 수정: GetDB() 사용
 
 	// 서비스 생성
 	authService := handler.NewAuthService(config.DB)
@@ -30,6 +32,7 @@ func main() {
 	leaveService := service.NewLeaveService(leaveRepo)
 	salaryService := service.NewSalaryService("./files/salary")
 	scheduleService := service.NewScheduleService(scheduleRepo)
+	scheduleSharingService := service.NewScheduleSharingService(scheduleSharingRepo) // 추가
 
 	// 핸들러 생성
 	authHandler := handler.NewAuthHandler(authService)
@@ -39,6 +42,7 @@ func main() {
 	leaveHandler := handler.NewLeaveHandler(leaveService)
 	salaryHandler := handler.NewSalaryHandler(salaryService)
 	scheduleHandler := handler.NewScheduleHandler(scheduleService)
+	scheduleSharingHandler := handler.NewScheduleSharingHandler(scheduleSharingService) // 추가
 
 	// 라우터 설정
 	http.HandleFunc("/api/register", registerHandler.HandleRegister)
@@ -73,6 +77,34 @@ func main() {
 	http.HandleFunc("/api/schedules", scheduleHandler.GetSchedulesByUser)   // GET: 일정 조회
 	http.HandleFunc("/api/schedule/update", scheduleHandler.UpdateSchedule) // PUT: 일정 수정
 	http.HandleFunc("/api/schedule/delete", scheduleHandler.DeleteSchedule) // DELETE: 일정 삭제
+
+	// 스케줄 공유 관련 라우트 추가
+	http.HandleFunc("/api/schedule-sharing/users/all", scheduleSharingHandler.GetAllDepartmentUsers)
+	http.HandleFunc("/api/schedule-sharing/users/department/", scheduleSharingHandler.GetUsersByDepartment)
+	http.HandleFunc("/api/schedule-sharing/users/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "GET" {
+			path := strings.TrimPrefix(r.URL.Path, "/api/schedule-sharing/users/")
+			if path == "" {
+				http.Error(w, "User ID required", http.StatusBadRequest)
+				return
+			}
+
+			// /api/schedule-sharing/users/{userId}/schedules
+			if strings.HasSuffix(path, "/schedules") {
+				userIDStr := strings.TrimSuffix(path, "/schedules")
+				if userIDStr == "" {
+					http.Error(w, "User ID required", http.StatusBadRequest)
+					return
+				}
+				scheduleSharingHandler.GetUserSchedulesByID(w, r)
+			} else {
+				// /api/schedule-sharing/users/{userId}
+				scheduleSharingHandler.GetUserSchedulesByID(w, r) // GetUserWithSchedulesByID → GetUserSchedulesByID
+			}
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
 
 	// 사용자 프로필 조회 라우트 추가
 	http.HandleFunc("/api/user/profile", authService.GetUserProfile)

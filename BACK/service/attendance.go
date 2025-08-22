@@ -32,7 +32,7 @@ func (s *AttendanceServiceImpl) PostAttendance(userID int, date time.Time, actio
 	if action == "checkin" {
 		if !s.isOfficeNetwork(clientIP) {
 			fmt.Printf("[PostAttendance] 회사 네트워크가 아닌 IP에서 출근 시도: %s\n", clientIP)
-			return fmt.Errorf("출근은 회사 Wi-Fi(192.168.0.x)에서만 가능합니다")
+			return fmt.Errorf("출근은 회사 Wi-Fi(172.30.1.x)에서만 가능합니다")
 		}
 	}
 
@@ -107,7 +107,7 @@ func (s *AttendanceServiceImpl) isOfficeNetwork(ip string) bool {
 
 	// 회사 Wi-Fi IP 범위 설정
 	allowedNetworks := []string{
-		"192.168.0.0/24", // 회사 Wi-Fi (192.168.0.1 ~ 192.168.0.254)
+		"172.30.1.0/24", // 회사 Wi-Fi (192.168.0.1 ~ 192.168.0.254)
 		//"127.0.0.1",      // 로컬호스트 (개발/테스트용)
 		//"::1",            // IPv6 로컬호스트
 	}

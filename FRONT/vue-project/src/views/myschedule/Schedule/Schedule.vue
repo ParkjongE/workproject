@@ -3,11 +3,11 @@
     <SideBar v-if="!hideSideBar" />
     <ContentArea :class="{ 'full-width': hideSideBar }">
       <HeaderContainer>
-        <Title>나의 일정 수정</Title>
-        <EditPrivacyBtn v-if="!editingPrivacy" @click="startEditingPrivacy">
+        <Title>{{ isOtherMember ? `${memberData?.name || '구성원'}의 일정` : '나의 일정 수정' }}</Title>
+        <EditPrivacyBtn v-if="!isOtherMember && !editingPrivacy" @click="startEditingPrivacy">
           <i class="edit-icon">✏️</i> 공개 설정 편집
         </EditPrivacyBtn>
-        <DonePrivacyBtn v-else @click="finishEditingPrivacy">
+        <DonePrivacyBtn v-if="!isOtherMember && editingPrivacy" @click="finishEditingPrivacy">
           <i class="done-icon">✓</i> 완료
         </DonePrivacyBtn>
       </HeaderContainer>
@@ -15,33 +15,39 @@
         <!-- 시계 섹션 -->
         <ClockSection 
           :selectedDate="selectedDate"
-          :mySchedules="mySchedules"
+          :mySchedules="currentSchedules"
+          :isOtherMember="isOtherMember"
+          :memberData="memberData"
           @schedule-selected="handleScheduleSelected"
           @schedule-edited="handleScheduleEdited"
           @schedule-deleted="handleScheduleDeleted"
           @schedule-added="handleScheduleAdded"
         />
         
-            <!-- 정보 카드 섹션 -->
-    <InfoCardSection 
-      :editingPrivacy="editingPrivacy"
-      :privacySettings="privacySettings"
-      :selectedDate="selectedDate"
-      @privacy-changed="handlePrivacyChanged"
-      @attendance-updated="handleAttendanceUpdated"
-    />
+        <!-- 정보 카드 섹션 -->
+        <InfoCardSection 
+          :editingPrivacy="editingPrivacy"
+          :privacySettings="privacySettings"
+          :selectedDate="selectedDate"
+          :isOtherMember="isOtherMember"
+          :memberData="memberData"
+          @privacy-changed="handlePrivacyChanged"
+          @attendance-updated="handleAttendanceUpdated"
+        />
         
         <!-- 달력 섹션 -->
         <CalendarSection 
           :selectedDate="selectedDate"
-          :mySchedules="mySchedules"
+          :mySchedules="currentSchedules"
+          :isOtherMember="isOtherMember"
+          :memberData="memberData"
           @day-selected="onDaySelected"
           @schedule-selected="handleScheduleSelected"
         />
       </ScheduleManagement>
       
-      <!-- 파일 업로드 폼 -->
-      <div v-if="showUploadForm" class="upload-form">
+      <!-- 파일 업로드 폼 (본인만 표시) -->
+      <div v-if="!isOtherMember && showUploadForm" class="upload-form">
         <div class="form-header">
           <h4>급여명세서 첨부</h4>
           <button class="close-btn" @click="showUploadForm = false">×</button>
@@ -93,6 +99,15 @@ export default {
     hideSideBar: {
       type: Boolean,
       default: false
+    },
+    // 다른 구성원 데이터를 위한 props
+    memberData: {
+      type: Object,
+      default: null
+    },
+    isOtherMember: {
+      type: Boolean,
+      default: false
     }
   },
   components: {
@@ -110,10 +125,14 @@ export default {
   },
   watch: {
     $route() {
+      // 다른 구성원의 일정을 보는 경우에는 라우트 변경 감지를 하지 않음
+      if (this.isOtherMember) return;
       this.fetchMySchedules();
     },
     mySchedules: {
       handler(newSchedules) {
+        // 다른 구성원의 일정을 보는 경우에는 일정 변경 감지를 하지 않음
+        if (this.isOtherMember) return;
         console.log('[Schedule] mySchedules 변경됨, 일정 수:', newSchedules.length);
       },
       deep: true
@@ -146,6 +165,23 @@ export default {
       attendanceStore
     };
   },
+  computed: {
+    // 다른 구성원의 일정을 사용할지 결정
+    currentSchedules() {
+      if (this.isOtherMember && this.memberData) {
+        return this.memberData.schedules || [];
+      }
+      return this.mySchedules;
+    },
+    
+    // 다른 구성원의 이름
+    currentMemberName() {
+      if (this.isOtherMember && this.memberData) {
+        return this.memberData.name || '구성원';
+      }
+      return '나';
+    }
+  },
   data() {
     const today = new Date();
     return {
@@ -171,8 +207,16 @@ export default {
     };
   },
   mounted() {
-    // 초기화
+    // 다른 구성원의 일정을 보는 경우에도 달력 초기화는 필요 (드래그 투 셀렉트를 위해)
     this.initializeCalendar();
+    
+    // 다른 구성원의 일정을 보는 경우에는 데이터 로딩을 하지 않음
+    if (this.isOtherMember) {
+      console.log('[Schedule] 다른 구성원 일정 모드 - 데이터 로딩 건너뜀, 드래그 투 셀렉트는 활성화');
+      return;
+    }
+    
+    // 초기화 (본인 일정 모드에서만)
     this.attendanceStore.initializeAttendance();
     this.fetchMySchedules();
     
@@ -184,6 +228,9 @@ export default {
     }
   },
   beforeUpdate() {
+    // 다른 구성원의 일정을 보는 경우에는 업데이트 로직을 실행하지 않음
+    if (this.isOtherMember) return;
+    
     // 컴포넌트 업데이트 전 실행
     console.log('[Schedule] 컴포넌트 업데이트 전, 현재 일정 수:', this.mySchedules.length);
     
@@ -221,11 +268,14 @@ export default {
     
     // 전체 일정 상태 확인
     if (this.mySchedules.length === 0) {
-      console.log('[Schedule] 모든 일정이 삭제됨, 빈 화면 표시 시작');
+      console.log('[Schedule] 컴포넌트 업데이트 전, 현재 일정 수:', this.mySchedules.length);
     }
   },
   beforeUnmount() {
-    // 정리
+    // 다른 구성원의 일정을 보는 경우에는 타이머 정리를 하지 않음
+    if (this.isOtherMember) return;
+    
+    // 정리 (본인 일정 모드에서만)
     this.attendanceStore.stopTimer();
   },
   methods: {

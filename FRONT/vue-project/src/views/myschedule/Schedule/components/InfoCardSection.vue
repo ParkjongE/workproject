@@ -24,15 +24,15 @@
       <template v-else>
         <LeaveItem>
           <LeaveLabel>부여된 연차:</LeaveLabel>
-          <LeaveValue>{{ leaveInfo ? leaveInfo.total_earned_days : totalLeave }}일</LeaveValue>
+          <LeaveValue>{{ getLeaveData().totalLeave }}일</LeaveValue>
         </LeaveItem>
         <LeaveItem>
           <LeaveLabel>사용한 연차:</LeaveLabel>
-          <LeaveValue>{{ leaveInfo ? leaveInfo.used_days : usedLeave }}일</LeaveValue>
+          <LeaveValue>{{ getLeaveData().usedLeave }}일</LeaveValue>
         </LeaveItem>
         <LeaveItem>
           <LeaveLabel>남은 연차:</LeaveLabel>
-          <LeaveValue>{{ leaveInfo ? leaveInfo.remaining_days : remainingLeave }}일</LeaveValue>
+          <LeaveValue>{{ getLeaveData().remainingLeave }}일</LeaveValue>
         </LeaveItem>
       </template>
     </InfoCard>
@@ -57,32 +57,32 @@
       <AttendanceStatus>
         <StatusItem>
           <StatusLabel>출근 시간:</StatusLabel>
-          <StatusValue :class="{ 'recorded': todayAttendance && todayAttendance.checkInTime }">
-            {{ todayAttendance && todayAttendance.checkInTime || '-' }}
+          <StatusValue :class="{ 'recorded': getAttendanceData().checkInTime }">
+            {{ getAttendanceData().checkInTime || '-' }}
           </StatusValue>
         </StatusItem>
         <StatusItem>
           <StatusLabel>퇴근 시간:</StatusLabel>
-          <StatusValue :class="{ 'recorded': todayAttendance && todayAttendance.checkOutTime }">
-            {{ todayAttendance && todayAttendance.checkOutTime || '-' }}
+          <StatusValue :class="{ 'recorded': getAttendanceData().checkOutTime }">
+            {{ getAttendanceData().checkOutTime || '-' }}
           </StatusValue>
         </StatusItem>
         <StatusItem>
           <StatusLabel>근무 시간:</StatusLabel>
-          <StatusValue :class="{ 'recorded': workingHours !== '-' }">
-            {{ workingHours }}
+          <StatusValue :class="{ 'recorded': getAttendanceData().workingHours !== '-' }">
+            {{ getAttendanceData().workingHours }}
           </StatusValue>
         </StatusItem>
-        <StatusItem v-if="todayAttendance && todayAttendance.status">
+        <StatusItem v-if="getAttendanceData().status">
           <StatusLabel>상태:</StatusLabel>
           <StatusValue :class="{ 'recorded': true }">
-            {{ todayAttendance.status }}
+            {{ getAttendanceData().status }}
           </StatusValue>
         </StatusItem>
       </AttendanceStatus>
       
-      <!-- 출퇴근 버튼 -->
-      <AttendanceButtons>
+      <!-- 출퇴근 버튼 (본인만 표시) -->
+      <AttendanceButtons v-if="!isOtherMember">
         <CheckInBtn 
           @click="handleCheckIn"
           :disabled="!isToday || (todayAttendance && todayAttendance.checkInTime)"
@@ -186,6 +186,14 @@ export default {
     selectedDate: {
       type: String,
       default: () => new Date().toISOString().split('T')[0]
+    },
+    isOtherMember: {
+      type: Boolean,
+      default: false
+    },
+    memberData: {
+      type: Object,
+      default: null
     }
   },
   emits: ['privacy-changed', 'attendance-updated'],
@@ -193,8 +201,9 @@ export default {
 
     const attendanceStore = useAttendanceStore();
 
-    // 선택된 날짜가 변경될 때마다 해당 날짜의 출퇴근 기록 로드
+    // 선택된 날짜가 변경될 때마다 해당 날짜의 출퇴근 기록 로드 (다른 구성원이 아닐 때만)
     watch(() => props.selectedDate, async (newDate) => {
+      if (props.isOtherMember) return; // 다른 구성원일 때는 로딩하지 않음
       if (newDate) {
         await attendanceStore.loadAttendanceByDate(newDate);
       }
@@ -225,6 +234,12 @@ export default {
     };
   },
   mounted() {
+    // 다른 구성원의 일정을 보는 경우에는 데이터 로딩을 하지 않음
+    if (this.isOtherMember) {
+      console.log('[InfoCardSection] 다른 구성원 일정 모드 - 데이터 로딩 건너뜀');
+      return;
+    }
+    
     console.log('[InfoCardSection] 컴포넌트 마운트됨, 선택된 날짜:', this.selectedDate);
     console.log('[InfoCardSection] loadLeaveInfo 함수 존재 여부:', typeof this.loadLeaveInfo);
     
@@ -245,6 +260,9 @@ export default {
   watch: {
     selectedDate: {
       handler(newDate) {
+        // 다른 구성원의 일정을 보는 경우에는 날짜 변경 감지를 하지 않음
+        if (this.isOtherMember) return;
+        
         console.log('[InfoCardSection] 선택된 날짜 변경:', newDate);
         if (newDate) {
           console.log('[InfoCardSection] watch에서 출퇴근 기록 로드 시작');
@@ -285,6 +303,46 @@ export default {
     }
   },
   methods: {
+    // 출퇴근 데이터 가져오기 (다른 구성원일 때는 memberData에서, 본인일 때는 store에서)
+    getAttendanceData() {
+      if (this.isOtherMember && this.memberData) {
+        // 다른 구성원의 출퇴근 데이터 (memberData에서 가져오거나 기본값)
+        return {
+          checkInTime: this.memberData.todayAttendance?.checkInTime || null,
+          checkOutTime: this.memberData.todayAttendance?.checkOutTime || null,
+          workingHours: this.memberData.todayAttendance?.workingHours || '-',
+          status: this.memberData.todayAttendance?.status || null
+        };
+      } else {
+        // 본인의 출퇴근 데이터 (store에서 가져옴)
+        return {
+          checkInTime: this.todayAttendance?.checkInTime || null,
+          checkOutTime: this.todayAttendance?.checkOutTime || null,
+          workingHours: this.workingHours || '-',
+          status: this.todayAttendance?.status || null
+        };
+      }
+    },
+    
+    // 연차 데이터 가져오기 (다른 구성원일 때는 memberData에서, 본인일 때는 로컬 데이터에서)
+    getLeaveData() {
+      if (this.isOtherMember && this.memberData) {
+        // 다른 구성원의 연차 데이터 (memberData에서 가져오거나 기본값 0)
+        return {
+          totalLeave: this.memberData.totalLeave || 0,
+          usedLeave: this.memberData.usedLeave || 0,
+          remainingLeave: (this.memberData.totalLeave || 0) - (this.memberData.usedLeave || 0)
+        };
+      } else {
+        // 본인의 연차 데이터 (로컬 데이터에서 가져옴)
+        return {
+          totalLeave: this.leaveInfo ? this.leaveInfo.total_earned_days : this.totalLeave,
+          usedLeave: this.leaveInfo ? this.leaveInfo.used_days : this.usedLeave,
+          remainingLeave: this.leaveInfo ? this.leaveInfo.remaining_days : this.remainingLeave
+        };
+      }
+    },
+    
     // 연차 정보 관련
     async loadLeaveInfo() {
       try {
